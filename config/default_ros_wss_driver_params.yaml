@@ -1,0 +1,16 @@
+node_name: ros_wss_driver_node
+config_path: /home/lemf/Documents/GitHub/HFI_ROS_WSS_Driver/Config
+log_path: /home/lemf/Documents/GitHub/HFI_ROS_WSS_Driver/logs/wss_driver.log
+serial_port: ""
+test_mode: false
+max_retries: 5
+tick_interval_ms: 10
+ch1_topic: /dom/thumb/stimulation_value
+ch2_topic: /dom/index/stimulation_value
+ch3_topic: ""
+ch4_topic: ""
+ch5_topic: ""
+ch6_topic: ""
+ch7_topic: ""
+ch8_topic: ""
+ch9_topic: ""

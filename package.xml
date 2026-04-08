@@ -1,0 +1,37 @@
+<package format="3">
+    <name>hfi_ros_wss_driver</name>
+    <version>0.1.0</version>
+    <description>
+        This provides a ROS2 interface which maps incoming stimulation magnitudes to WSS stimulation commands.
+    </description>
+    <maintainer email="smock@ucla.edu">Stephen Mock</maintainer>
+    <license>MIT</license>
+
+    <buildtool_depend>ament_cmake</buildtool_depend>
+
+    <depend>rclpy</depend>
+    <depend>std_msgs</depend>
+    <exec_depend>ament_index_python</exec_depend>
+    <exec_depend>launch</exec_depend>
+    <exec_depend>launch_ros</exec_depend>
+    <exec_depend>ros2launch</exec_depend>
+
+    <exec_depend>python3-yaml</exec_depend>
+
+    <buildtool_depend>ament_cmake_python</buildtool_depend>
+
+    <test_depend>ament_cmake_pytest</test_depend>
+    <test_depend>pytest</test_depend>
+    <test_depend>python3-pytest</test_depend>
+
+    <test_depend>ament_cmake_ros</test_depend>
+    <test_depend>launch</test_depend>
+    <test_depend>launch_ros</test_depend>
+    <test_depend>launch_testing</test_depend>
+    <test_depend>launch_testing_ament_cmake</test_depend>
+    <test_depend>rclpy</test_depend>
+
+    <export>
+        <build_type>ament_cmake</build_type>
+    </export>
+</package>
