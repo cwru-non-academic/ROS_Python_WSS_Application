@@ -1,0 +1,3 @@
+[submodule "HFI_WSS_Python_Interface"]
+	path = HFI_WSS_Python_Interface
+	url = git@github.com:cwru-non-academic/HFI_WSS_Python_Interface.git
