@@ -115,6 +115,13 @@ actual wrapper/Core model path with Core's in-memory emulator. See
 [tests/BASELINE.md](tests/BASELINE.md) and [.github/ROS_COMPATIBILITY.md](.github/ROS_COMPATIBILITY.md).
 These are development checks, not certification of every ROS distro or hardware.
 
+The Windows job also executes the unchanged ten-case canonical NUnit corpus
+through the same controller factory used by ROS node setup, preserving all
+eighteen assertions. Its results, the separate model report and both native
+layout reports form seven source-bound evidence files. Normal CI evidence is
+not candidate approval: automatic promotion additionally requires the reviewed
+v2 wrapper/CLI/ROS proof and a fresh preflight of the actual merged wrapper.
+
 ## Debugging
 
 - Repo-owned WSS JSON configuration lives under `Config/`.
