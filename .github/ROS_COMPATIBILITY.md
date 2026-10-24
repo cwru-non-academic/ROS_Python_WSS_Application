@@ -46,17 +46,22 @@ overrides without changing production configuration. Both issues predate this pi
 upgrade. No Core fix, hardware configuration change, or physical safety claim is
 included here.
 
-## Fan-out interface for the separate pipeline coordinator
+## Versioned fan-out endpoints
 
 This repository owns `ros-ci.yml` and acceptance job **ROS compatibility**.
-Proposed endpoints are `wss-preflight.yml` with inputs `candidate_json`,
+Endpoints are `wss-preflight.yml` with inputs `candidate_json`,
 `wrapper_sha`, `ros_sha`, `correlation_id`, and `promote-integration.yml` with
 `wrapper_sha`, `wrapper_pr`, `approval_json`. The gitlink remains
 `HFI_WSS_Python_Interface`; the repository is
 `cwru-non-academic/ROS_Python_WSS_Application`.
 
-Promotion wiring must follow the coordinator's versioned contract, not reuse a
-CLI approval as ROS approval. Evidence must bind exact ROS/wrapper source SHAs,
+The implementation follows the [published v2 contract](https://github.com/cwru-non-academic/Python_WSS_Integration_Lib/blob/bb3bb0c3bb2caf5c1e0f6a9924d651b49c6467a6/.github/PYTHON_FANOUT_CONTRACT.md).
+Normal CI and candidate preflight pin their validators to that exact commit.
+Promotion deliberately uses reviewed tools on library `dev`, validates v2 proof
+before target-only dispatch/write tokens, re-preflights the actual merged wrapper,
+and permits only the `HFI_WSS_Python_Interface` gitlink change. A CLI-only v1
+approval is rejected for ROS. No CLI approval is reused as ROS approval.
+Evidence binds exact ROS/wrapper source SHAs,
 candidate producer/artifact/archive tuple, full payload digest, development host
 and runtime, fixture identities, independent model and ROS/layout results, and
 result/log hashes. Canonical ten shared cases remain unchanged and separate;
@@ -64,3 +69,25 @@ they do not by themselves cover ROS callbacks or StimWithMode. Require successfu
 non-skipped ROS jobs, fresh post-merge wrapper validation, source race checks,
 target-specific idempotency and human-reviewed gitlink-only PRs. No merge/release
 or final Core propagation experiment is authorized by these checks.
+
+The Windows job runs the exact ten canonical NUnit cases through
+`create_controller`, the same production factory used by node setup. Only the
+canonical fixture's controller factory/type alias changes; its eighteen assertion
+expressions and all scenario values remain unchanged. ROS dependencies are
+doubled in that embedded Python host. It supplements, rather than replaces, the
+real-model and native ROS suites. The complete verified payload is transferred
+by hash to the Humble job and installed as a fresh directory, never overlaid.
+
+The `python-preflight-evidence` artifact contains exactly `evidence.json`,
+`results.xml`, `dotnet.log`, `projection.json`, `ros-model.json`,
+`ros-native-symlink.json`, and `ros-native-copy.json`. Shared validators check
+report coverage and file hashes. Negative safety checks reject stale/tampered
+reports, skipped model cases, incomplete model scenarios, missing DDS channels,
+and CLI-only approvals. Ordinary CI produces the same evidence structure under
+`ros-compatibility-evidence`, with mode `committed`; it is not a candidate approval.
+
+Deployment remains separate: publish these workflows to default `main` and the
+routine `dev` branch through reviewed human merges, and provide existing App
+capabilities. A genuine changed Core candidate must pass wrapper, CLI and ROS
+preflights and all v2 validators before any full fan-out success can be claimed.
+Authored endpoints or normal green CI do not establish that end-to-end proof.

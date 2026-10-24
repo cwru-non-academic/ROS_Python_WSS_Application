@@ -1,0 +1,116 @@
+name: Promote Integration submodule
+run-name: Promote Integration ${{ inputs.wrapper_sha }} / wss-${{ fromJSON(inputs.approval_json).candidate.run_id }}-${{ fromJSON(inputs.approval_json).candidate.artifact_id }}
+on:
+  workflow_dispatch:
+    inputs:
+      wrapper_sha: {required: true, type: string}
+      wrapper_pr: {required: true, type: string}
+      approval_json: {required: true, type: string}
+permissions:
+  contents: read
+concurrency:
+  group: python-promote-ros-dev
+  cancel-in-progress: false
+jobs:
+  promote:
+    name: promote
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - name: Require trusted dev event
+        env:
+          APPROVAL_JSON: ${{ inputs.approval_json }}
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF -cne 'refs/heads/dev' -or $env:GITHUB_EVENT_NAME -cne 'workflow_dispatch') { throw 'Only dev dispatch is accepted.' }
+          if (($env:APPROVAL_JSON | ConvertFrom-Json).schema -cne 'wss-python-promotion/v2') { throw 'ROS requires independent v2 approval.' }
+      - uses: actions/checkout@v4
+        with:
+          path: source
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require candidate-promotion baseline approval
+        shell: pwsh
+        run: |
+          $config = Get-Content source/.github/python-ci.json -Raw | ConvertFrom-Json
+          if (!$config.baseline_ready) { throw 'Candidate-promotion baseline approval remains pending; Python via pythonnet CI does not authorize promotion.' }
+      - uses: actions/create-github-app-token@v2
+        id: read
+        with:
+          app-id: ${{ vars.WSS_GITHUB_APP_ID }}
+          private-key: ${{ secrets.WSS_GITHUB_APP_PRIVATE_KEY }}
+          owner: cwru-non-academic
+          repositories: WSSCore,Python_WSS_Integration_Lib,CLI_Python_WSS_Application,ROS_Python_WSS_Application
+          permission-contents: read
+          permission-actions: read
+          permission-pull-requests: read
+      - name: Check out trusted wrapper tools; never execute the caller-nominated merge source
+        uses: actions/checkout@v4
+        with:
+          repository: cwru-non-academic/Python_WSS_Integration_Lib
+          ref: dev
+          path: promotion-tools
+          token: ${{ steps.read.outputs.token }}
+          persist-credentials: false
+
+      - name: Validate reviewed wrapper, candidate and no-op before dispatch credentials
+        id: candidate
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ steps.read.outputs.token }}
+          APPROVAL_JSON: ${{ inputs.approval_json }}
+          WRAPPER_MERGE_SHA: ${{ inputs.wrapper_sha }}
+          WRAPPER_PR: ${{ inputs.wrapper_pr }}
+        run: |
+          ./promotion-tools/.github/scripts/Prepare-PythonPromotion.ps1 -Role ros -RepositoryRoot "$env:GITHUB_WORKSPACE/source" -WorkRoot "$env:RUNNER_TEMP/python-validation" -ApprovalJson $env:APPROVAL_JSON -WrapperMergeSha $env:WRAPPER_MERGE_SHA -WrapperPr $env:WRAPPER_PR -ValidateOnly
+      - name: Mint ROS-only preflight dispatch token after merge validation
+        if: steps.candidate.outputs.no_op == 'false'
+        uses: actions/create-github-app-token@v2
+        id: preflight
+        with:
+          app-id: ${{ vars.WSS_GITHUB_APP_ID }}
+          private-key: ${{ secrets.WSS_GITHUB_APP_PRIVATE_KEY }}
+          owner: cwru-non-academic
+          repositories: ROS_Python_WSS_Application
+          permission-actions: write
+      - name: Revalidate initial proof and execute actual merged-wrapper ROS preflight
+        if: steps.candidate.outputs.no_op == 'false'
+        id: prepare
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ steps.read.outputs.token }}
+          PYTHON_PREFLIGHT_TOKEN: ${{ steps.preflight.outputs.token }}
+          APPROVAL_JSON: ${{ inputs.approval_json }}
+          WRAPPER_MERGE_SHA: ${{ inputs.wrapper_sha }}
+          WRAPPER_PR: ${{ inputs.wrapper_pr }}
+        run: |
+          ./promotion-tools/.github/scripts/Prepare-PythonPromotion.ps1 -Role ros -RepositoryRoot "$env:GITHUB_WORKSPACE/source" -WorkRoot "$env:RUNNER_TEMP/python-promotion" -ApprovalJson $env:APPROVAL_JSON -WrapperMergeSha $env:WRAPPER_MERGE_SHA -WrapperPr $env:WRAPPER_PR
+      - name: Mint target-only write token after validation
+        if: steps.prepare.outputs.no_op == 'false'
+        uses: actions/create-github-app-token@v2
+        id: write
+        with:
+          app-id: ${{ vars.WSS_GITHUB_APP_ID }}
+          private-key: ${{ secrets.WSS_GITHUB_APP_PRIVATE_KEY }}
+          owner: cwru-non-academic
+          repositories: ROS_Python_WSS_Application
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Create or reuse exact constrained PR; never merge
+        if: steps.prepare.outputs.no_op == 'false'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ steps.read.outputs.token }}
+          PYTHON_PUSH_TOKEN: ${{ steps.write.outputs.token }}
+        run: ./promotion-tools/.github/scripts/Publish-PythonPromotion.ps1 -RepositoryRoot "$env:GITHUB_WORKSPACE/source" -WorkRoot "$env:RUNNER_TEMP/python-promotion"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: python-promotion-record
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/python-promotion/approval.json
+            ${{ runner.temp }}/python-promotion/prepared.json
+            ${{ runner.temp }}/python-promotion/projection.json
+            ${{ runner.temp }}/python-validation/prepared.json

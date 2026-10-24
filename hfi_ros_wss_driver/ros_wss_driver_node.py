@@ -29,6 +29,11 @@ _ensure_wrapper_importable()
 from wss_py_wrapper import StimulationController, WssConfig
 
 
+def create_controller(config: WssConfig) -> StimulationController:
+    """Construct the controller used by node setup and conformance hosts."""
+    return StimulationController(config)
+
+
 class RosWssDriverNode(Node):
     def __init__(
         self, test_flag: bool = False, node_name: str = "ros_wss_driver_node",
@@ -117,7 +122,7 @@ class RosWssDriverNode(Node):
         if serial_port:
             config = replace(config, serial_port=serial_port)
 
-        self._controller = StimulationController(config)
+        self._controller = create_controller(config)
         self._controller.Initialize()
 
         for channel, topic_name in configured_topics:
