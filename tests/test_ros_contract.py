@@ -131,7 +131,7 @@ class RosContractTests(unittest.TestCase):
             node = driver.RosWssDriverNode(cs_lib_dir=external)
         self.addCleanup(node.destroy_node)
         self.assertEqual(node._controller._config.cs_lib_dir, external.resolve())
-        self.assertTrue(any(level == "warn" and "unverified" in message and str(external) in message for level, message in node.logger.messages))
+        self.assertTrue(any(level == "warn" and "unverified" in message and str(external.resolve()) in message for level, message in node.logger.messages))
         self.assertTrue(any(level == "info" and "wrapper=" in message and "DLLs=" in message for level, message in node.logger.messages))
 
     def test_initialization_failure_cleans_up_and_propagates(self):

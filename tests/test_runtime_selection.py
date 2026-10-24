@@ -63,7 +63,7 @@ sys.modules['ament_index_python'] = ament; sys.modules['ament_index_python.packa
 from hfi_ros_wss_driver.runtime import application_root, load_bundled_wrapper
 assert application_root() == Path(sys.argv[3]).resolve()
 wrapper = load_bundled_wrapper()
-assert Path(wrapper.__file__).is_relative_to(Path(sys.argv[3]))
+assert Path(wrapper.__file__).resolve().is_relative_to(Path(sys.argv[3]).resolve())
 assert 'clr' not in sys.modules
 """, site, share, cwd=root)
 

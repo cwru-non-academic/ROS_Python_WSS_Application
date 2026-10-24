@@ -1,7 +1,7 @@
 name: ROS CI
 on:
   push:
-    branches: [main, dev, 'codex/ros-compatibility']
+    branches: [main, dev]
   pull_request:
     branches: [main, dev]
   workflow_dispatch:
