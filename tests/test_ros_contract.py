@@ -125,6 +125,34 @@ class RosContractTests(unittest.TestCase):
         self.assertIsNone(node._controller)
         self.assertTrue(any("shutdown fixture" in message for _, message in node.logger.messages))
 
+    def test_external_dll_path_warns_and_is_not_substituted(self):
+        external = self.root / "deliberately-missing-external"
+        with patch.object(driver.StimulationController, "Initialize"):
+            node = driver.RosWssDriverNode(cs_lib_dir=external)
+        self.addCleanup(node.destroy_node)
+        self.assertEqual(node._controller._config.cs_lib_dir, external.resolve())
+        self.assertTrue(any(level == "warn" and "unverified" in message and str(external) in message for level, message in node.logger.messages))
+        self.assertTrue(any(level == "info" and "wrapper=" in message and "DLLs=" in message for level, message in node.logger.messages))
+
+    def test_initialization_failure_cleans_up_and_propagates(self):
+        with patch.object(driver.StimulationController, "Initialize", side_effect=RuntimeError("init fixture")), patch.object(driver.StimulationController, "Shutdown") as shutdown:
+            with self.assertRaisesRegex(RuntimeError, "init fixture"):
+                driver.RosWssDriverNode()
+        self.assertEqual(shutdown.call_count, 1)
+
+    def test_entrypoint_shuts_down_ros_after_construction_failure(self):
+        import importlib.util
+        import sys
+        script = Path(__file__).resolve().parents[1] / "scripts" / "ros_wss_driver.py"
+        spec = importlib.util.spec_from_file_location("entrypoint_fixture", script)
+        entrypoint = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(entrypoint)
+        ros = sys.modules["rclpy"]
+        with patch.object(ros, "init", create=True), patch.object(ros, "shutdown", create=True) as shutdown, patch.object(entrypoint, "RosWssDriverNode", side_effect=RuntimeError("init fixture")):
+            with self.assertRaisesRegex(RuntimeError, "init fixture"):
+                entrypoint.main()
+        shutdown.assert_called_once_with()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -38,4 +38,18 @@ install(DIRECTORY Config/
   FILES_MATCHING PATTERN "*.json"
 )
 
+# Install wrapper code and the complete pinned payload together. Neither a
+# separately pip-installed wrapper nor the source checkout is needed at launch.
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/HFI_WSS_Python_Interface/src/wss_py_wrapper/__init__.py")
+  message(FATAL_ERROR "Initialize the pinned HFI_WSS_Python_Interface submodule before building")
+endif()
+install(DIRECTORY HFI_WSS_Python_Interface/src/wss_py_wrapper
+  DESTINATION share/${PROJECT_NAME}/HFI_WSS_Python_Interface/src
+  FILES_MATCHING PATTERN "*.py"
+  PATTERN "__pycache__" EXCLUDE
+)
+install(DIRECTORY HFI_WSS_Python_Interface/Cs_Libraries/
+  DESTINATION share/${PROJECT_NAME}/HFI_WSS_Python_Interface/Cs_Libraries
+)
+
 ament_package()

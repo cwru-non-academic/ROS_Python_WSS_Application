@@ -24,12 +24,23 @@ The table below lists the direct dependencies needed for this repository.
 
 1. **Clone the Repository**:
    ```bash
-   git clone --recurse-submodules git@github.com:cwru-non-academic/HFI_ROS_WSS_Driver.git
-   cd HFI_ROS_WSS_Driver
+   git clone --recurse-submodules git@github.com:cwru-non-academic/ROS_Python_WSS_Application.git
+   cd ROS_Python_WSS_Application
    ```
 
 2. **Install Dependencies**:
-   Ensure your ROS2 environment is sourced and that the Python wrapper dependency can be imported from the included submodule.
+   Source your ROS2 environment and ensure `pythonnet` is available to the Python
+   interpreter used by ROS. If it is not already installed, install the runtime
+   prerequisite with that interpreter:
+
+   ```bash
+   python3 -m pip install -r requirements.txt
+   ```
+
+   A separate installation of `wss-py-wrapper` is no longer required. The build
+   installs the pinned wrapper source and complete DLL payload together. Existing
+   ROS/CLR environments can be reused; the CI development host versions below are
+   not a new requirement to install a .NET SDK on the application computer.
 
 3. **Review Driver Configuration**:
    Update `config/default_ros_wss_driver_params.yaml` as needed.
@@ -46,7 +57,27 @@ The table below lists the direct dependencies needed for this repository.
    Build the package using `colcon`:
    ```bash
    colcon build --packages-select hfi_ros_wss_driver --symlink-install
+   source install/setup.bash
    ```
+
+### Updating an existing checkout
+
+Stop the running node, then use the normal update/rebuild sequence:
+
+```bash
+git pull
+git submodule sync --recursive
+git submodule update --init --recursive
+colcon build --packages-select hfi_ros_wss_driver --symlink-install
+source install/setup.bash
+```
+
+Plain `git pull` does not guarantee the checked-out submodule follows the new
+gitlink. The update command selects the exact reviewed pin, not the newest
+library branch. Restart the node after rebuilding; replacing WSS assemblies
+inside a running process is unsupported. No existing publisher/client code needs
+to change. Retain existing YAML and calibration paths; the example YAML's absolute
+paths are examples for an existing installation, not portable defaults.
 
 ## Running the ROS WSS Driver
 
@@ -69,7 +100,20 @@ Incoming values are clamped to the range `[0.0, 1.0]` before being sent to `Stim
 
 ## Running Unit Tests
 
-No unit tests are currently included in this repository.
+Run the hardware-free contract/import/lifecycle tests from the repository root:
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+ROS CI additionally builds with colcon on a **development baseline** of ROS 2
+Humble / Ubuntu 22.04 x64, checks symlink and copied installs, resolves the same
+launch command, and exercises all nine `Float64` topics through real rclpy/DDS
+with a recording managed-layer double. It never opens a serial/BLE transport.
+A separate Windows x64 CPython 3.12 / pythonnet 3.0.5 / .NET 9 host tests the
+actual wrapper/Core model path with Core's in-memory emulator. See
+[tests/BASELINE.md](tests/BASELINE.md) and [.github/ROS_COMPATIBILITY.md](.github/ROS_COMPATIBILITY.md).
+These are development checks, not certification of every ROS distro or hardware.
 
 ## Debugging
 
@@ -80,3 +124,16 @@ No unit tests are currently included in this repository.
 - The number of non-empty channel topics updates `Config/stimConfig.json` `maxWSS` automatically: 1-3 topics -> `1`, 4-6 topics -> `2`, 7-9 topics -> `3`.
 - Leave a channel topic empty in the YAML to disable that channel subscription.
 - The default example maps `/dom/index/stimulation_value` to `ch2`.
+- Startup reports the selected wrapper file and DLL directory. Bundled wrapper
+  code takes precedence over an unrelated pip installation. A different wrapper
+  already imported in the process causes a clear restart error, not a hot swap.
+- Deliberate external DLL selection remains possible with `WSS_CS_LIB_DIR=/path/to/Cs_Libraries`
+  before launch, or the Python node constructor's optional `cs_lib_dir` keyword.
+  The node honors it and warns that compatibility is unverified. It does not
+  silently fall back, enforce a version/hash allowlist, alter calibration, or
+  select another serial port. Load/initialization errors stop startup.
+- The existing Core model-capacity limitation remains: `StimWithMode` sizes model
+  state by device count rather than channel count. Existing nested model constants
+  also retain their historical fallback behavior because Core looks up bare keys.
+  Neither behavior is repaired by this compatibility change. Calibration or Core
+  behavior corrections require their own review because output can change.
