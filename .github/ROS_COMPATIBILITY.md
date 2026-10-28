@@ -48,7 +48,9 @@ included here.
 
 ## Versioned fan-out endpoints
 
-This repository owns `ros-ci.yml` and acceptance job **ROS compatibility**.
+This repository owns `ros-ci.yml` and ordinary acceptance job **ROS general
+conformance**. Candidate preflight retains its **ROS compatibility** acceptance
+name for the existing versioned promotion contract.
 Endpoints are `wss-preflight.yml` with inputs `candidate_json`,
 `wrapper_sha`, `ros_sha`, `correlation_id`, and `promote-integration.yml` with
 `wrapper_sha`, `wrapper_pr`, `approval_json`. The gitlink remains
@@ -102,12 +104,21 @@ Ordinary PR and push CI on main/dev exposes these exact checks:
 
 | Check | Executed scope |
 | --- | --- |
-| ROS general conformance | Windows embedded Python host; unchanged ten shared Core cases and eighteen assertions through the production ROS controller factory; ROS APIs doubled |
+| ROS general conformance | Windows embedded Python host; unchanged ten shared Core cases and eighteen assertions through the production ROS controller factory; ROS APIs doubled. Also assembles/verifies the existing seven-file source-bound proof and runs negative evidence checks after every platform/native suite succeeds |
 | ROS platform compatibility (Windows) | Actual Python import/layout, public application contracts, lifecycle, five model tests/fifteen device-scenario observations; installed wrapper wheel, actual Ports selection/construction and shared C# Serial/BLE loading tests |
 | ROS platform compatibility (Ubuntu) | The same application and wrapper platform checks on Ubuntu |
 | ROS platform compatibility (macOS) | The same application and wrapper platform checks on x64 macOS; explicit unsupported BLE backend skip recorded in TRX and JSON |
-| ROS native compatibility (Ubuntu / Humble) | Actual colcon symlink/copy installs, launch resolution and all nine Float64 topics through native rclpy/DDS on Ubuntu 22.04/Humble; recording managed-layer double, no CLR or transport |
-| ROS compatibility | Existing promotion acceptance name; requires canonical, every platform job and native ROS, then verifies the same seven source-bound evidence files and rejection checks |
+| ROS-specific compatibility (Humble) | Actual colcon symlink/copy installs, launch resolution and all nine Float64 topics through native rclpy/DDS on Ubuntu 22.04/Humble; recording managed-layer double, no CLR or transport |
+
+These are the five checks intended for the ordinary PR ruleset. `Stage verified
+ROS inputs` is a helper job that verifies the committed wrapper/source and full
+payload, then transfers the hashed payload to the native job. Platform/native
+jobs depend on that helper; general conformance waits for their success and
+executes both the canonical tests and evidence validation. This avoids a cycle
+without adding a sixth ordinary acceptance context. Failure/skip of any required
+dependency makes general conformance fail. Ordinary CI has no separate
+`ROS compatibility` job; that name remains only in the unchanged candidate
+preflight workflow.
 
 The platform jobs execute real application/Core model logic with ROS API doubles;
 they do not install or certify native ROS on Windows or macOS. The separate native
@@ -118,6 +129,7 @@ No job opens a physical serial port or connects to a BLE device.
 
 The canonical job no longer runs the model/contracts suite. Windows model evidence
 comes from the Windows platform job, and native reports come from the native job;
-the seven-file promotion format, source identities and payload hashes are retained.
+the seven-file promotion format, source identities and payload hashes are retained
+inside general conformance.
 The candidate-preflight workflow, dispatch/fan-out endpoints, public application
 interface, configuration and Core behavior remain unchanged.

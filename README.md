@@ -125,10 +125,12 @@ not candidate approval: automatic promotion additionally requires the reviewed
 v2 wrapper/CLI/ROS proof and a fresh preflight of the actual merged wrapper.
 The three OS checks are named `ROS platform compatibility (Windows)`,
 `ROS platform compatibility (Ubuntu)` and `ROS platform compatibility (macOS)`.
-`ROS native compatibility (Ubuntu / Humble)` retains the real colcon/DDS checks.
+`ROS-specific compatibility (Humble)` retains the real colcon/DDS checks.
 macOS BLE is explicitly skipped because no backend is implemented; green platform
-checks do not claim native ROS support on Windows/macOS. The `ROS compatibility`
-gate still verifies all suites and the existing promotion evidence format.
+checks do not claim native ROS support on Windows/macOS. `ROS general conformance`
+also verifies all suites and the existing promotion evidence format, so ordinary
+PRs have five acceptance checks. `Stage verified ROS inputs` is a staging helper.
+The unchanged candidate preflight retains its `ROS compatibility` acceptance name.
 
 ## Debugging
 
