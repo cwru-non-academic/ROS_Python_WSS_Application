@@ -33,3 +33,15 @@ foreach ($case in @('hash','model-skip','native-channel','model-scenario')) {
 }
 if (@(Get-PythonEvidenceFiles ros).Count -ne 7 -or @(Get-PythonEvidenceJobs ros).Count -ne 3) { throw 'ROS role contract changed.' }
 Write-Output 'ROS negative evidence checks passed; these are rejection tests, not promotion approval.'
+
+foreach ($case in @('installed-count','installed-record-hash','installed-digest')) {
+    $copy=Join-Path (Split-Path -Parent $Root) ('ros-negative-'+[guid]::NewGuid().ToString('N'))
+    Copy-Item -LiteralPath $Root -Destination $copy -Recurse
+    $path=Join-Path $copy 'ros-native-copy.json'
+    $report=Get-Content $path -Raw | ConvertFrom-Json
+    if ($case -ceq 'installed-count') { $report.installed_payload.verified_files=0 }
+    elseif ($case -ceq 'installed-record-hash') { $report.installed_payload.projection_record_sha256=('0'*64) }
+    else { $report.installed_payload.projection_sha256=('0'*64) }
+    $report | ConvertTo-Json -Depth 10 | Set-Content $path
+    Require-Rejection $case { & (Join-Path $PSScriptRoot 'Complete-RosEvidence.ps1') -ToolsRoot $ToolsRoot -Root $copy }
+}

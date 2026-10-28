@@ -2,7 +2,7 @@
 
 Baseline commit `0cb18e0` captures ten passing contract tests before changes at
 wrapper `60f29a8cf4c777bcc85d2f8d90da1abde46079ea`. The complete pin now selects
-Python integration `51ac8228d23469d7361ffd3a52f3e71cc3336c3f`, containing Core
+Python integration `94d78c49a622bd4d15587f869c4cd5ac063c13b8`, containing Core
 `5ec22900587587e9e9465ffa53d04d7d1ce13545`. Its candidate manifest binds producer
 run `39092192696`, artifact `12123267360`, archive SHA256
 `3bc303096594978fa77e95cd80901a8fb72d26c42a7408c38c8668563b6f1a7e`.
@@ -58,11 +58,11 @@ Endpoints are `wss-preflight.yml` with inputs `candidate_json`,
 `cwru-non-academic/ROS_Python_WSS_Application`.
 
 The implementation follows the [published v2 contract](https://github.com/cwru-non-academic/Python_WSS_Integration_Lib/blob/bb3bb0c3bb2caf5c1e0f6a9924d651b49c6467a6/.github/PYTHON_FANOUT_CONTRACT.md).
-Candidate preflight retains its validator pin at that exact contract commit.
-Ordinary CI pins its shared platform tools and validators to the merged wrapper
-commit `51ac8228d23469d7361ffd3a52f3e71cc3336c3f`. The universal payload and
-versioned evidence schema are unchanged; this wrapper also contains the tested
-Unix DLL-path loading correction used by Python integration/CLI compatibility.
+Candidate and ordinary CI pin shared receiver tools to
+`94d78c49a622bd4d15587f869c4cd5ac063c13b8` (Python wrapper PR #8), and the
+macOS-aware shared C# fixture to `02172a64c55becd5535204f46f10b4755bf3ee05`
+(C# PR #22). Those source PRs require human review independently of this receiver.
+The canonical ten cases and eighteen assertions are unchanged.
 Promotion deliberately uses reviewed tools on library `dev`, validates v2 proof
 before target-only dispatch/write tokens, re-preflights the actual merged wrapper,
 and permits only the `HFI_WSS_Python_Interface` gitlink change. A CLI-only v1
@@ -133,3 +133,36 @@ the seven-file promotion format, source identities and payload hashes are retain
 inside general conformance.
 The candidate-preflight workflow, dispatch/fan-out endpoints, public application
 interface, configuration and Core behavior remain unchanged.
+
+## macOS BLE receiver preparation
+
+The shared validator accepts exactly the legacy 25-file inventory or the declared
+27-file macOS BLE inventory; extra files, undeclared backends and missing declared
+assets fail. The committed payload remains legacy, so a green ordinary macOS job
+does not claim BLE support for that payload.
+
+Candidate preflight now runs ROS platform compatibility on Windows, Ubuntu and
+macOS, in addition to the existing canonical/model and real Humble DDS suites.
+Each platform resolves the exact canonical Core dev-push artifact independently,
+checks producer provenance, and publishes source/run/hash-bound platform and
+Python smoke reports. A declared macOS backend must pass ABI, inert context,
+managed backend/factory and shared C# tests. No scan, connection or physical I/O
+is performed. ROS APIs remain doubled in platform/model checks; real native ROS
+coverage remains the separate Ubuntu 22.04/Humble suite.
+
+Both native colcon layouts verify every installed payload byte against the
+cross-job attested manifest, including the macOS dylib even on the Ubuntu host.
+The existing directory installation rule already copies the complete payload.
+Evidence assembly rejects mismatched installed counts, hashes or projection
+digests. The legacy seven-file candidate proof format, v2 three-consumer proof
+requirement and automatic CLI/ROS fan-out remain intact.
+
+The five ordinary required check names remain:
+- ROS general conformance
+- ROS platform compatibility (Windows)
+- ROS platform compatibility (Ubuntu)
+- ROS platform compatibility (macOS)
+- ROS-specific compatibility (Humble)
+
+New-payload promotion waits for reviewed receivers and a canonical Core dev-push
+producer. PR artifacts cannot substitute for that provenance.
