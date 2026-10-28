@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   python-core:
-    name: ROS model and contract fixtures (Windows development host)
+    name: ROS general conformance
     runs-on: windows-2022
     timeout-minutes: 20
     outputs:
@@ -52,7 +52,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: bb3bb0c3bb2caf5c1e0f6a9924d651b49c6467a6
+          ref: 51ac8228d23469d7361ffd3a52f3e71cc3336c3f
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4
@@ -124,19 +124,10 @@ jobs:
           $record = Get-Content "$env:RUNNER_TEMP/canonical/projection.json" -Raw | ConvertFrom-Json
           $payload = if ($env:ROS_MODE -ceq 'candidate') { "$env:RUNNER_TEMP/canonical/projection" } else { "$env:GITHUB_WORKSPACE/wrapper/Cs_Libraries" }
           Assert-PythonProjection $payload $record
-          ./source/.github/scripts/Stage-RosRuntime.ps1 -RosRoot "$env:GITHUB_WORKSPACE/source" -WrapperRoot "$env:GITHUB_WORKSPACE/wrapper" -PayloadRoot $payload -ProjectionPath "$env:RUNNER_TEMP/canonical/projection.json" -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -Destination "$env:RUNNER_TEMP/ros-runtime"
           New-Item -ItemType Directory -Path "$env:RUNNER_TEMP/ros-transfer" | Out-Null
           Copy-Item -LiteralPath $payload -Destination "$env:RUNNER_TEMP/ros-transfer/payload" -Recurse
           Copy-Item -LiteralPath "$env:RUNNER_TEMP/canonical/projection.json" -Destination "$env:RUNNER_TEMP/ros-transfer/projection.json"
           "projection_record_sha256=$((Get-FileHash "$env:RUNNER_TEMP/ros-transfer/projection.json").Hash.ToLowerInvariant())" >> $env:GITHUB_OUTPUT
-      - name: ROS contracts, imports, configuration and lifecycle
-        shell: pwsh
-        run: |
-          Set-Location "$env:RUNNER_TEMP/ros-runtime"
-          python -m unittest discover -s tests -v
-          if ($LASTEXITCODE -ne 0) { throw 'ROS contract fixtures failed.' }
-          python -u conformance/ros_emulator.py --output "$env:RUNNER_TEMP/canonical/ros-model.json"
-          if ($LASTEXITCODE -ne 0) { throw 'ROS model fixtures failed.' }
       - uses: actions/upload-artifact@v4
         with:
           name: ros-staged-payload
@@ -151,7 +142,6 @@ jobs:
             ${{ runner.temp }}/canonical/results.xml
             ${{ runner.temp }}/canonical/dotnet.log
             ${{ runner.temp }}/canonical/projection.json
-            ${{ runner.temp }}/canonical/ros-model.json
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -160,8 +150,77 @@ jobs:
           path: |
             ${{ runner.temp }}/canonical/*.log
             ${{ runner.temp }}/canonical/nunit/*.xml
+  platform-compatibility:
+    name: ROS platform compatibility (${{ matrix.name }})
+    needs: python-core
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-2022
+          - name: Ubuntu
+            os: ubuntu-latest
+          - name: macOS
+            os: macos-15-intel
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: source
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: cwru-non-academic/Python_WSS_Integration_Lib
+          ref: ${{ needs.python-core.outputs.wrapper }}
+          path: wrapper
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: cwru-non-academic/Python_WSS_Integration_Lib
+          ref: 51ac8228d23469d7361ffd3a52f3e71cc3336c3f
+          path: tools
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: cwru-non-academic/CSharp_WSS_Integration_Lib
+          ref: 7145e2307f997f703748530bf74311ef94455e98
+          path: fixture
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.316'
+      - run: python -m pip install build==1.2.2.post1 pythonnet==3.0.5 PyYAML==6.0.3
+      - name: Check actual application contracts, model and platform runtime
+        shell: pwsh
+        env:
+          WRAPPER_SHA: ${{ needs.python-core.outputs.wrapper }}
+        run: |
+          ./source/.github/scripts/Invoke-RosPlatformCompatibility.ps1 -RosRoot "$env:GITHUB_WORKSPACE/source" -RosSha $env:GITHUB_SHA -WrapperRoot "$env:GITHUB_WORKSPACE/wrapper" -WrapperSha $env:WRAPPER_SHA -FixtureRoot "$env:GITHUB_WORKSPACE/fixture" -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -OutputRoot "$env:RUNNER_TEMP/ros-platform"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ros-platform-${{ matrix.name }}
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/ros-platform/platform-summary.json
+            ${{ runner.temp }}/ros-platform/ros-model.json
+            ${{ runner.temp }}/ros-platform/wrapper-platform/platform.json
+            ${{ runner.temp }}/ros-platform/wrapper-platform/platform.trx
+      - name: Retain the Windows model report for existing promotion evidence
+        uses: actions/upload-artifact@v4
+        if: matrix.name == 'Windows'
+        with:
+          name: ros-model-evidence
+          if-no-files-found: error
+          path: ${{ runner.temp }}/ros-platform/ros-model.json
   ros-build:
-    name: ROS colcon and installed DDS fixture (Humble development baseline)
+    name: ROS native compatibility (Ubuntu / Humble)
     needs: python-core
     runs-on: ubuntu-22.04
     container: ros:humble-ros-base-jammy
@@ -233,7 +292,7 @@ jobs:
   acceptance:
     name: ROS compatibility
     if: always()
-    needs: [python-core, ros-build]
+    needs: [python-core, platform-compatibility, ros-build]
     runs-on: windows-2022
     steps:
       - name: Reject skipped or failed suites before assembling evidence
@@ -241,8 +300,9 @@ jobs:
         env:
           MODEL_RESULT: ${{ needs.python-core.result }}
           ROS_RESULT: ${{ needs.ros-build.result }}
+          PLATFORM_RESULT: ${{ needs.platform-compatibility.result }}
         run: |
-          if ($env:MODEL_RESULT -cne 'success' -or $env:ROS_RESULT -cne 'success') { throw 'Both independent suites must succeed.' }
+          if ($env:MODEL_RESULT -cne 'success' -or $env:ROS_RESULT -cne 'success' -or $env:PLATFORM_RESULT -cne 'success') { throw 'Canonical, all platform suites and native ROS must succeed.' }
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ros_sha || github.sha }}
@@ -250,7 +310,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: bb3bb0c3bb2caf5c1e0f6a9924d651b49c6467a6
+          ref: 51ac8228d23469d7361ffd3a52f3e71cc3336c3f
           path: tools
           persist-credentials: false
       - uses: actions/download-artifact@v4
@@ -260,6 +320,10 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: ros-native-evidence
+          path: ${{ runner.temp }}/ros-evidence
+      - uses: actions/download-artifact@v4
+        with:
+          name: ros-model-evidence
           path: ${{ runner.temp }}/ros-evidence
       - name: Verify all seven files with the versioned shared ROS validators
         shell: pwsh

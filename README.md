@@ -110,17 +110,25 @@ ROS CI additionally builds with colcon on a **development baseline** of ROS 2
 Humble / Ubuntu 22.04 x64, checks symlink and copied installs, resolves the same
 launch command, and exercises all nine `Float64` topics through real rclpy/DDS
 with a recording managed-layer double. It never opens a serial/BLE transport.
-A separate Windows x64 CPython 3.12 / pythonnet 3.0.5 / .NET 9 host tests the
-actual wrapper/Core model path with Core's in-memory emulator. See
+Separate Windows, Ubuntu and x64 macOS CPython 3.12 / pythonnet 3.0.5 / .NET 9
+platform jobs test application contracts and the actual wrapper/Core model path
+with Core's in-memory emulator, plus runtime/backend loading. Their ROS APIs are
+doubled; native ROS coverage remains the separate Ubuntu/Humble job. See
 [tests/BASELINE.md](tests/BASELINE.md) and [.github/ROS_COMPATIBILITY.md](.github/ROS_COMPATIBILITY.md).
 These are development checks, not certification of every ROS distro or hardware.
 
-The Windows job also executes the unchanged ten-case canonical NUnit corpus
+The separate `ROS general conformance` Windows job executes the unchanged ten-case canonical NUnit corpus
 through the same controller factory used by ROS node setup, preserving all
 eighteen assertions. Its results, the separate model report and both native
 layout reports form seven source-bound evidence files. Normal CI evidence is
 not candidate approval: automatic promotion additionally requires the reviewed
 v2 wrapper/CLI/ROS proof and a fresh preflight of the actual merged wrapper.
+The three OS checks are named `ROS platform compatibility (Windows)`,
+`ROS platform compatibility (Ubuntu)` and `ROS platform compatibility (macOS)`.
+`ROS native compatibility (Ubuntu / Humble)` retains the real colcon/DDS checks.
+macOS BLE is explicitly skipped because no backend is implemented; green platform
+checks do not claim native ROS support on Windows/macOS. The `ROS compatibility`
+gate still verifies all suites and the existing promotion evidence format.
 
 ## Debugging
 
