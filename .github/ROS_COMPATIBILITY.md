@@ -2,7 +2,7 @@
 
 Baseline commit `0cb18e0` captures ten passing contract tests before changes at
 wrapper `60f29a8cf4c777bcc85d2f8d90da1abde46079ea`. The complete pin now selects
-Python integration `b527733d0c3fb213a515cd5a3e7b4a0d66b461c0`, containing Core
+Python integration `51ac8228d23469d7361ffd3a52f3e71cc3336c3f`, containing Core
 `5ec22900587587e9e9465ffa53d04d7d1ce13545`. Its candidate manifest binds producer
 run `39092192696`, artifact `12123267360`, archive SHA256
 `3bc303096594978fa77e95cd80901a8fb72d26c42a7408c38c8668563b6f1a7e`.
@@ -48,7 +48,9 @@ included here.
 
 ## Versioned fan-out endpoints
 
-This repository owns `ros-ci.yml` and acceptance job **ROS compatibility**.
+This repository owns `ros-ci.yml` and ordinary acceptance job **ROS general
+conformance**. Candidate preflight retains its **ROS compatibility** acceptance
+name for the existing versioned promotion contract.
 Endpoints are `wss-preflight.yml` with inputs `candidate_json`,
 `wrapper_sha`, `ros_sha`, `correlation_id`, and `promote-integration.yml` with
 `wrapper_sha`, `wrapper_pr`, `approval_json`. The gitlink remains
@@ -56,7 +58,11 @@ Endpoints are `wss-preflight.yml` with inputs `candidate_json`,
 `cwru-non-academic/ROS_Python_WSS_Application`.
 
 The implementation follows the [published v2 contract](https://github.com/cwru-non-academic/Python_WSS_Integration_Lib/blob/bb3bb0c3bb2caf5c1e0f6a9924d651b49c6467a6/.github/PYTHON_FANOUT_CONTRACT.md).
-Normal CI and candidate preflight pin their validators to that exact commit.
+Candidate preflight retains its validator pin at that exact contract commit.
+Ordinary CI pins its shared platform tools and validators to the merged wrapper
+commit `51ac8228d23469d7361ffd3a52f3e71cc3336c3f`. The universal payload and
+versioned evidence schema are unchanged; this wrapper also contains the tested
+Unix DLL-path loading correction used by Python integration/CLI compatibility.
 Promotion deliberately uses reviewed tools on library `dev`, validates v2 proof
 before target-only dispatch/write tokens, re-preflights the actual merged wrapper,
 and permits only the `HFI_WSS_Python_Interface` gitlink change. A CLI-only v1
@@ -91,3 +97,39 @@ routine `dev` branch through reviewed human merges, and provide existing App
 capabilities. A genuine changed Core candidate must pass wrapper, CLI and ROS
 preflights and all v2 validators before any full fan-out success can be claimed.
 Authored endpoints or normal green CI do not establish that end-to-end proof.
+
+## Separate conformance and platform checks
+
+Ordinary PR and push CI on main/dev exposes these exact checks:
+
+| Check | Executed scope |
+| --- | --- |
+| ROS general conformance | Windows embedded Python host; unchanged ten shared Core cases and eighteen assertions through the production ROS controller factory; ROS APIs doubled. Also assembles/verifies the existing seven-file source-bound proof and runs negative evidence checks after every platform/native suite succeeds |
+| ROS platform compatibility (Windows) | Actual Python import/layout, public application contracts, lifecycle, five model tests/fifteen device-scenario observations; installed wrapper wheel, actual Ports selection/construction and shared C# Serial/BLE loading tests |
+| ROS platform compatibility (Ubuntu) | The same application and wrapper platform checks on Ubuntu |
+| ROS platform compatibility (macOS) | The same application and wrapper platform checks on x64 macOS; explicit unsupported BLE backend skip recorded in TRX and JSON |
+| ROS-specific compatibility (Humble) | Actual colcon symlink/copy installs, launch resolution and all nine Float64 topics through native rclpy/DDS on Ubuntu 22.04/Humble; recording managed-layer double, no CLR or transport |
+
+These are the five checks intended for the ordinary PR ruleset. `Stage verified
+ROS inputs` is a helper job that verifies the committed wrapper/source and full
+payload, then transfers the hashed payload to the native job. Platform/native
+jobs depend on that helper; general conformance waits for their success and
+executes both the canonical tests and evidence validation. This avoids a cycle
+without adding a sixth ordinary acceptance context. Failure/skip of any required
+dependency makes general conformance fail. Ordinary CI has no separate
+`ROS compatibility` job; that name remains only in the unchanged candidate
+preflight workflow.
+
+The platform jobs execute real application/Core model logic with ROS API doubles;
+they do not install or certify native ROS on Windows or macOS. The separate native
+Ubuntu/Humble check is required to establish the existing ROS development baseline.
+No native ROS test is skipped and relabeled as support on another OS. macOS BLE
+is also explicitly unimplemented, while its other platform checks still execute.
+No job opens a physical serial port or connects to a BLE device.
+
+The canonical job no longer runs the model/contracts suite. Windows model evidence
+comes from the Windows platform job, and native reports come from the native job;
+the seven-file promotion format, source identities and payload hashes are retained
+inside general conformance.
+The candidate-preflight workflow, dispatch/fan-out endpoints, public application
+interface, configuration and Core behavior remain unchanged.
