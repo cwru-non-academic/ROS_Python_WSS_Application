@@ -1,0 +1,276 @@
+name: WSS ROS preflight
+run-name: WSS preflight ${{ fromJSON(inputs.candidate_json).run_id }} / ${{ inputs.correlation_id }}
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_json: {required: true, type: string}
+      wrapper_sha: {required: true, type: string}
+      ros_sha: {required: true, type: string}
+      correlation_id: {required: true, type: string}
+env:
+  ROS_MODE: candidate
+permissions:
+  contents: read
+concurrency:
+  group: ros-preflight-${{ inputs.correlation_id || github.ref }}
+  cancel-in-progress: false
+jobs:
+  python-core:
+    name: ROS model and contract fixtures (Windows development host)
+    runs-on: windows-2022
+    timeout-minutes: 20
+    outputs:
+      wrapper: ${{ steps.sources.outputs.wrapper }}
+      projection_record_sha256: ${{ steps.transfer.outputs.projection_record_sha256 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ros_sha || github.sha }}
+          path: source
+          persist-credentials: false
+      - name: Require exact source, candidate inputs and correlation before credentials
+        id: sources
+        shell: pwsh
+        env:
+          WRAPPER_SHA: ${{ inputs.wrapper_sha }}
+          ROS_SHA: ${{ inputs.ros_sha }}
+          CANDIDATE_JSON: ${{ inputs.candidate_json }}
+          CORRELATION: ${{ inputs.correlation_id }}
+        run: |
+          $source = (git -C source rev-parse HEAD).Trim()
+          if ($source -cne $env:GITHUB_SHA) { throw 'ROS source differs from exact workflow source.' }
+          if ($env:ROS_MODE -ceq 'candidate') {
+            if ($env:GITHUB_REF -cne 'refs/heads/dev' -or $env:ROS_SHA -cne $source -or $env:WRAPPER_SHA -cnotmatch '^[0-9a-f]{40}$') { throw 'Candidate preflight requires exact dev sources.' }
+            $c = $env:CANDIDATE_JSON | ConvertFrom-Json
+            $expected = "wss-$($c.run_id)-$($c.artifact_id)-$($env:WRAPPER_SHA)-$source"
+            if ($env:CORRELATION -cne $expected) { throw 'Candidate/source correlation mismatch.' }
+            $wrapper = $env:WRAPPER_SHA
+          } else {
+            $entry = git -C source ls-tree HEAD -- HFI_WSS_Python_Interface
+            if ($entry -cnotmatch '^160000 commit ([0-9a-f]{40})\s+HFI_WSS_Python_Interface$') { throw 'Missing committed wrapper gitlink.' }
+            $wrapper = $Matches[1]
+          }
+          "wrapper=$wrapper" >> $env:GITHUB_OUTPUT
+      - uses: actions/checkout@v4
+        with:
+          repository: cwru-non-academic/Python_WSS_Integration_Lib
+          ref: bb3bb0c3bb2caf5c1e0f6a9924d651b49c6467a6
+          path: tools
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: cwru-non-academic/Python_WSS_Integration_Lib
+          ref: ${{ steps.sources.outputs.wrapper }}
+          path: wrapper
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: cwru-non-academic/CSharp_WSS_Integration_Lib
+          ref: 7145e2307f997f703748530bf74311ef94455e98
+          path: fixture
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.316'
+      - run: python -m pip install pythonnet==3.0.5 PyYAML==6.0.3
+      - uses: actions/create-github-app-token@v2
+        if: env.ROS_MODE == 'candidate'
+        id: read
+        with:
+          app-id: ${{ vars.WSS_GITHUB_APP_ID }}
+          private-key: ${{ secrets.WSS_GITHUB_APP_PRIVATE_KEY }}
+          owner: cwru-non-academic
+          repositories: WSSCore
+          permission-contents: read
+          permission-actions: read
+      - name: Resolve exact producer artifact without fallback
+        if: env.ROS_MODE == 'candidate'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ steps.read.outputs.token }}
+          CANDIDATE_JSON: ${{ inputs.candidate_json }}
+        run: |
+          . ./tools/.github/scripts/PythonPromotion.ps1
+          $c = $env:CANDIDATE_JSON | ConvertFrom-Json
+          Assert-PythonProducer $c
+          ./tools/.github/scripts/Resolve-WssRelease.ps1 -RunId $c.run_id -ExpectedArtifactId $c.artifact_id -ExpectedCommit $c.commit -ArchiveName $c.archive -ExpectedSha256 $c.sha256 -OutputRoot "$env:RUNNER_TEMP/resolved"
+      - name: Execute unchanged canonical corpus through the ROS production factory
+        shell: pwsh
+        env:
+          WRAPPER_SHA: ${{ steps.sources.outputs.wrapper }}
+        run: |
+          $options = @{
+            WrapperRoot = "$env:GITHUB_WORKSPACE/wrapper"
+            FixtureRoot = "$env:GITHUB_WORKSPACE/fixture"
+            WrapperSha = $env:WRAPPER_SHA
+            RosRoot = "$env:GITHUB_WORKSPACE/source"
+            RosSha = $env:GITHUB_SHA
+            ToolsRoot = "$env:GITHUB_WORKSPACE/tools"
+            ConfigPath = "$env:GITHUB_WORKSPACE/source/.github/python-ci.json"
+            OutputRoot = "$env:RUNNER_TEMP/canonical"
+            Mode = $env:ROS_MODE
+          }
+          if ($env:ROS_MODE -ceq 'candidate') {
+            $options.ArtifactRoot = "$env:RUNNER_TEMP/resolved/extracted/WSS-Universal"
+            $options.CandidatePath = "$env:RUNNER_TEMP/resolved/candidate.json"
+          }
+          ./source/.github/scripts/Invoke-RosConformance.ps1 @options
+      - name: Stage verified complete payload for model and native ROS suites
+        id: transfer
+        shell: pwsh
+        run: |
+          . ./tools/.github/scripts/PythonContract.ps1
+          $record = Get-Content "$env:RUNNER_TEMP/canonical/projection.json" -Raw | ConvertFrom-Json
+          $payload = if ($env:ROS_MODE -ceq 'candidate') { "$env:RUNNER_TEMP/canonical/projection" } else { "$env:GITHUB_WORKSPACE/wrapper/Cs_Libraries" }
+          Assert-PythonProjection $payload $record
+          ./source/.github/scripts/Stage-RosRuntime.ps1 -RosRoot "$env:GITHUB_WORKSPACE/source" -WrapperRoot "$env:GITHUB_WORKSPACE/wrapper" -PayloadRoot $payload -ProjectionPath "$env:RUNNER_TEMP/canonical/projection.json" -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -Destination "$env:RUNNER_TEMP/ros-runtime"
+          New-Item -ItemType Directory -Path "$env:RUNNER_TEMP/ros-transfer" | Out-Null
+          Copy-Item -LiteralPath $payload -Destination "$env:RUNNER_TEMP/ros-transfer/payload" -Recurse
+          Copy-Item -LiteralPath "$env:RUNNER_TEMP/canonical/projection.json" -Destination "$env:RUNNER_TEMP/ros-transfer/projection.json"
+          "projection_record_sha256=$((Get-FileHash "$env:RUNNER_TEMP/ros-transfer/projection.json").Hash.ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+      - name: ROS contracts, imports, configuration and lifecycle
+        shell: pwsh
+        run: |
+          Set-Location "$env:RUNNER_TEMP/ros-runtime"
+          python -m unittest discover -s tests -v
+          if ($LASTEXITCODE -ne 0) { throw 'ROS contract fixtures failed.' }
+          python -u conformance/ros_emulator.py --output "$env:RUNNER_TEMP/canonical/ros-model.json"
+          if ($LASTEXITCODE -ne 0) { throw 'ROS model fixtures failed.' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ros-staged-payload
+          if-no-files-found: error
+          path: ${{ runner.temp }}/ros-transfer/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ros-canonical-evidence
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/canonical/evidence.json
+            ${{ runner.temp }}/canonical/results.xml
+            ${{ runner.temp }}/canonical/dotnet.log
+            ${{ runner.temp }}/canonical/projection.json
+            ${{ runner.temp }}/canonical/ros-model.json
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: ros-canonical-diagnostics
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/canonical/*.log
+            ${{ runner.temp }}/canonical/nunit/*.xml
+  ros-build:
+    name: ROS colcon and installed DDS fixture (Humble development baseline)
+    needs: python-core
+    runs-on: ubuntu-22.04
+    container: ros:humble-ros-base-jammy
+    timeout-minutes: 20
+    steps:
+      - name: Install development prerequisites
+        run: |
+          apt-get update
+          apt-get install -y git python3-pip python3-colcon-common-extensions ros-humble-ament-cmake-python ros-humble-launch-ros
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ros_sha || github.sha }}
+          path: source
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: cwru-non-academic/Python_WSS_Integration_Lib
+          ref: ${{ needs.python-core.outputs.wrapper }}
+          path: wrapper
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: ros-staged-payload
+          path: transfer
+      - name: Verify exact cross-job payload and stage an isolated application
+        shell: bash
+        env:
+          RECORD_SHA256: ${{ needs.python-core.outputs.projection_record_sha256 }}
+        run: |
+          set -eo pipefail
+          python3 source/.github/scripts/verify_staged_payload.py transfer "$RECORD_SHA256"
+          mkdir "$RUNNER_TEMP/ros-runtime"
+          git -C source archive HEAD | tar -x -C "$RUNNER_TEMP/ros-runtime"
+          mkdir -p "$RUNNER_TEMP/ros-runtime/HFI_WSS_Python_Interface"
+          cp -a wrapper/src "$RUNNER_TEMP/ros-runtime/HFI_WSS_Python_Interface/src"
+          cp -a transfer/payload "$RUNNER_TEMP/ros-runtime/HFI_WSS_Python_Interface/Cs_Libraries"
+          python3 -m pip install pythonnet==3.0.5
+      - name: Build symlink layout and verify launch and DDS callbacks
+        shell: bash
+        run: |
+          set -eo pipefail
+          source /opt/ros/humble/setup.bash
+          cd "$RUNNER_TEMP/ros-runtime"
+          python3 -m unittest discover -s tests -v
+          colcon build --packages-select hfi_ros_wss_driver --symlink-install
+          source install/setup.bash
+          ros2 launch hfi_ros_wss_driver launch_ros_wss_driver.launch.py --show-args
+          cp conformance/ros_native.py /tmp/ros-native-symlink.py
+          mkdir -p "$GITHUB_WORKSPACE/results"
+          cd /tmp
+          python3 /tmp/ros-native-symlink.py --output "$GITHUB_WORKSPACE/results/ros-native-symlink.json"
+      - name: Build copied layout and verify operation away from the checkout
+        shell: bash
+        run: |
+          set -eo pipefail
+          source /opt/ros/humble/setup.bash
+          cd "$RUNNER_TEMP/ros-runtime"
+          colcon --log-base log-copy build --packages-select hfi_ros_wss_driver --build-base build-copy --install-base install-copy
+          source install-copy/setup.bash
+          ros2 launch hfi_ros_wss_driver launch_ros_wss_driver.launch.py --show-args
+          cp conformance/ros_native.py /tmp/ros-native-copy.py
+          cd /tmp
+          python3 /tmp/ros-native-copy.py --output "$GITHUB_WORKSPACE/results/ros-native-copy.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ros-native-evidence
+          if-no-files-found: error
+          path: results/*.json
+  acceptance:
+    name: ROS compatibility
+    if: always()
+    needs: [python-core, ros-build]
+    runs-on: windows-2022
+    steps:
+      - name: Reject skipped or failed suites before assembling evidence
+        shell: pwsh
+        env:
+          MODEL_RESULT: ${{ needs.python-core.result }}
+          ROS_RESULT: ${{ needs.ros-build.result }}
+        run: |
+          if ($env:MODEL_RESULT -cne 'success' -or $env:ROS_RESULT -cne 'success') { throw 'Both independent suites must succeed.' }
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ros_sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: cwru-non-academic/Python_WSS_Integration_Lib
+          ref: bb3bb0c3bb2caf5c1e0f6a9924d651b49c6467a6
+          path: tools
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: ros-canonical-evidence
+          path: ${{ runner.temp }}/ros-evidence
+      - uses: actions/download-artifact@v4
+        with:
+          name: ros-native-evidence
+          path: ${{ runner.temp }}/ros-evidence
+      - name: Verify all seven files with the versioned shared ROS validators
+        shell: pwsh
+        run: ./.github/scripts/Complete-RosEvidence.ps1 -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -Root "$env:RUNNER_TEMP/ros-evidence"
+      - name: Run negative evidence safety checks
+        shell: pwsh
+        run: ./.github/scripts/Test-RosEvidence.ps1 -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -Root "$env:RUNNER_TEMP/ros-evidence"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-preflight-evidence
+          if-no-files-found: error
+          path: ${{ runner.temp }}/ros-evidence/

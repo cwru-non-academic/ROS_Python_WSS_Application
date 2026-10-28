@@ -8,14 +8,16 @@ from hfi_ros_wss_driver.ros_wss_driver_node import RosWssDriverNode
 def main(args=None):
     rclpy.init(args=args)
 
-    node = RosWssDriverNode()
-
+    node = None
     try:
-        rclpy.spin(node)
-    except Exception as e:
-        print(e)
+        node = RosWssDriverNode()
+        try:
+            rclpy.spin(node)
+        except Exception as e:
+            print(e)
     finally:
-        node.destroy_node()
+        if node is not None:
+            node.destroy_node()
         rclpy.shutdown()
 
 

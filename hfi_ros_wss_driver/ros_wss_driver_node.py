@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import sys
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
@@ -11,28 +10,18 @@ from pathlib import Path
 from rclpy.node import Node
 from std_msgs.msg import Float64
 
+from .runtime import (
+    application_root, load_bundled_wrapper, reject_loaded_wss_conflict,
+    selected_dll_directory,
+)
+
 
 def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[1]
+    return application_root()
 
 
 def _ensure_wrapper_importable() -> None:
-    try:
-        import wss_py_wrapper  # noqa: F401
-
-        return
-    except ModuleNotFoundError as exc:
-        wrapper_src = _repo_root() / "HFI_WSS_Python_Interface" / "src"
-        if wrapper_src.is_dir():
-            sys.path.insert(0, str(wrapper_src))
-            import wss_py_wrapper  # noqa: F401
-
-            return
-        raise ModuleNotFoundError(
-            "Could not import 'wss_py_wrapper'. Initialize the submodule at "
-            "HFI_WSS_Python_Interface and install the wrapper repo, or run this "
-            "node from the application checkout with the submodule present."
-        ) from exc
+    load_bundled_wrapper()
 
 
 _ensure_wrapper_importable()
@@ -40,8 +29,16 @@ _ensure_wrapper_importable()
 from wss_py_wrapper import StimulationController, WssConfig
 
 
+def create_controller(config: WssConfig) -> StimulationController:
+    """Construct the controller used by node setup and conformance hosts."""
+    return StimulationController(config)
+
+
 class RosWssDriverNode(Node):
-    def __init__(self, test_flag: bool = False, node_name: str = "ros_wss_driver_node"):
+    def __init__(
+        self, test_flag: bool = False, node_name: str = "ros_wss_driver_node",
+        *, cs_lib_dir: Path | None = None,
+    ):
         super().__init__(node_name)
 
         self.declare_parameter("node_name", node_name)
@@ -58,10 +55,18 @@ class RosWssDriverNode(Node):
             )
 
         self._controller: StimulationController | None = None
-        self._subscriptions = []
+        # rclpy owns Node._subscriptions; keep our references separately.
+        self._channel_subscriptions = []
+        self._explicit_cs_lib_dir = cs_lib_dir
 
         if not test_flag:
-            self.setup()
+            try:
+                self.setup()
+            except Exception as exc:
+                self.get_logger().error(f"WSS initialization failed: {exc}")
+                self.shutdown_controller()
+                super().destroy_node()
+                raise
 
     @staticmethod
     def _default_log_path() -> Path:
@@ -94,10 +99,22 @@ class RosWssDriverNode(Node):
         log_path.parent.mkdir(parents=True, exist_ok=True)
         self._update_max_wss_config(config_path, len(configured_topics))
 
+        bundled_dlls = _repo_root() / "HFI_WSS_Python_Interface" / "Cs_Libraries"
+        dlls = selected_dll_directory(bundled_dlls, self._explicit_cs_lib_dir)
+        if dlls != bundled_dlls.resolve():
+            self.get_logger().warn(
+                f"Using explicitly selected external WSS DLLs at {dlls}. "
+                "Compatibility with the bundled wrapper is unverified; no fallback "
+                "or in-process assembly replacement will be attempted."
+            )
+        import wss_py_wrapper
+
+        self.get_logger().info(f"WSS wrapper={wss_py_wrapper.__file__}, DLLs={dlls}")
+        reject_loaded_wss_conflict(dlls)
         config = WssConfig(
             config_path=config_path,
             log_path=log_path,
-            cs_lib_dir=_repo_root() / "HFI_WSS_Python_Interface" / "Cs_Libraries",
+            cs_lib_dir=dlls,
             test_mode=test_mode,
             max_setup_tries=max(1, max_retries),
             tick_interval_ms=max(1, tick_interval_ms),
@@ -105,7 +122,7 @@ class RosWssDriverNode(Node):
         if serial_port:
             config = replace(config, serial_port=serial_port)
 
-        self._controller = StimulationController(config)
+        self._controller = create_controller(config)
         self._controller.Initialize()
 
         for channel, topic_name in configured_topics:
@@ -115,7 +132,7 @@ class RosWssDriverNode(Node):
                 self._build_stim_callback(channel, topic_name),
                 10,
             )
-            self._subscriptions.append(subscription)
+            self._channel_subscriptions.append(subscription)
             self.get_logger().info(f"Mapped topic '{topic_name}' to ch{channel}.")
 
         self.get_logger().info(

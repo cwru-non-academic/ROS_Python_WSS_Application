@@ -1,0 +1,9 @@
+{
+  "schema": "wss-ros-ci/v1",
+  "baseline_wrapper_sha": "60f29a8cf4c777bcc85d2f8d90da1abde46079ea",
+  "wrapper_sha": "b527733d0c3fb213a515cd5a3e7b4a0d66b461c0",
+  "core_sha": "5ec22900587587e9e9465ffa53d04d7d1ce13545",
+  "development_targets": ["Windows x64, CPython 3.12, pythonnet 3.0.5, .NET 9", "Ubuntu 22.04 x64, ROS 2 Humble, system Python 3.10"],
+  "known_limitations": ["Core model arrays use device count instead of channel count", "Core model constant lookup uses bare keys; nested constants retain historical fallback behavior", "ROS device count follows topic count, not highest selected channel"],
+  "physical_transport_tested": false
+}
