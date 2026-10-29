@@ -31,7 +31,7 @@ class RosContractTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.config = self.root / "Config"
         self.config.mkdir()
-        self.original = {"maxWSS": 3, "firmware": "H03", "calibration_marker": [7, 8]}
+        self.original = {"maxWSS": 3, "firmware": "H03", "calibration_marker": [7, 8], "broadcastTarget": "0x8E", "wssTargets": ["0x80", "0x82", "0x83"]}
         (self.config / "stimConfig.json").write_text(json.dumps(self.original), encoding="ascii")
         self.params = b'{"stim":{"ch":{"1":{"minPW":20,"maxPW":100}}}}'
         (self.config / "stimParams.json").write_bytes(self.params)
