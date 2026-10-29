@@ -51,7 +51,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 51ac8228d23469d7361ffd3a52f3e71cc3336c3f
+          ref: 94d78c49a622bd4d15587f869c4cd5ac063c13b8
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4
@@ -111,13 +111,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 51ac8228d23469d7361ffd3a52f3e71cc3336c3f
+          ref: 94d78c49a622bd4d15587f869c4cd5ac063c13b8
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/CSharp_WSS_Integration_Lib
-          ref: 7145e2307f997f703748530bf74311ef94455e98
+          ref: 02172a64c55becd5535204f46f10b4755bf3ee05
           path: fixture
           persist-credentials: false
       - uses: actions/setup-python@v5
@@ -203,7 +203,7 @@ jobs:
           cp conformance/ros_native.py /tmp/ros-native-symlink.py
           mkdir -p "$GITHUB_WORKSPACE/results"
           cd /tmp
-          python3 /tmp/ros-native-symlink.py --output "$GITHUB_WORKSPACE/results/ros-native-symlink.json"
+          python3 /tmp/ros-native-symlink.py --projection "$GITHUB_WORKSPACE/transfer/projection.json" --output "$GITHUB_WORKSPACE/results/ros-native-symlink.json"
       - name: Build copied layout and verify operation away from the checkout
         shell: bash
         run: |
@@ -215,7 +215,7 @@ jobs:
           ros2 launch hfi_ros_wss_driver launch_ros_wss_driver.launch.py --show-args
           cp conformance/ros_native.py /tmp/ros-native-copy.py
           cd /tmp
-          python3 /tmp/ros-native-copy.py --output "$GITHUB_WORKSPACE/results/ros-native-copy.json"
+          python3 /tmp/ros-native-copy.py --projection "$GITHUB_WORKSPACE/transfer/projection.json" --output "$GITHUB_WORKSPACE/results/ros-native-copy.json"
       - uses: actions/upload-artifact@v4
         with:
           name: ros-native-evidence
@@ -269,7 +269,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 51ac8228d23469d7361ffd3a52f3e71cc3336c3f
+          ref: 94d78c49a622bd4d15587f869c4cd5ac063c13b8
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4
@@ -281,7 +281,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/CSharp_WSS_Integration_Lib
-          ref: 7145e2307f997f703748530bf74311ef94455e98
+          ref: 02172a64c55becd5535204f46f10b4755bf3ee05
           path: fixture
           persist-credentials: false
       - uses: actions/setup-python@v5

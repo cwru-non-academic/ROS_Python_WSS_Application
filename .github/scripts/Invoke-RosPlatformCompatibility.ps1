@@ -6,7 +6,10 @@ param(
     [Parameter(Mandatory)][string]$FixtureRoot,
     [Parameter(Mandatory)][string]$ToolsRoot,
     [Parameter(Mandatory)][string]$OutputRoot,
-    [string]$PythonExe='python'
+    [string]$PythonExe='python',
+    [ValidateSet('committed','candidate')][string]$Mode='committed',
+    [string]$ArtifactRoot='',
+    [string]$CandidatePath=''
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $ToolsRoot '.github/scripts/PythonContract.ps1')
@@ -14,12 +17,21 @@ Assert-PythonSource $RosRoot $RosSha -IgnoreSubmodule
 if (Test-Path -LiteralPath $OutputRoot) { throw 'ROS platform output must be new.' }
 New-Item -ItemType Directory -Path $OutputRoot | Out-Null
 # Exercise the same installed-wheel, Ports and C# backend checks as Python CLI.
-& (Join-Path $ToolsRoot '.github/scripts/Invoke-PlatformCompatibility.ps1') -WrapperRoot $WrapperRoot -WrapperSha $WrapperSha -FixtureRoot $FixtureRoot -OutputRoot (Join-Path $OutputRoot 'wrapper-platform') -PythonExe $PythonExe
+$candidateOptions = @{Mode=$Mode}
+if ($Mode -ceq 'candidate') { $candidateOptions.ArtifactRoot=$ArtifactRoot; $candidateOptions.CandidatePath=$CandidatePath }
+& (Join-Path $ToolsRoot '.github/scripts/Invoke-PlatformCompatibility.ps1') @candidateOptions -WrapperRoot $WrapperRoot -WrapperSha $WrapperSha -FixtureRoot $FixtureRoot -OutputRoot (Join-Path $OutputRoot 'wrapper-platform') -PythonExe $PythonExe
 if (!$?) { throw 'Shared Python platform compatibility failed.' }
 Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue
 $runtime = Join-Path $OutputRoot 'application'
 $projection = Join-Path $WrapperRoot '.github/python-candidate.json'
-& (Join-Path $RosRoot '.github/scripts/Stage-RosRuntime.ps1') -RosRoot $RosRoot -WrapperRoot $WrapperRoot -PayloadRoot (Join-Path $WrapperRoot 'Cs_Libraries') -ProjectionPath $projection -ToolsRoot $ToolsRoot -Destination $runtime
+$payload = Join-Path $WrapperRoot 'Cs_Libraries'
+if ($Mode -ceq 'candidate') {
+    $payload = Join-Path $OutputRoot 'wrapper-platform/projection'
+    $record = New-PythonProjection $ArtifactRoot $WrapperRoot (Join-Path $OutputRoot 'ros-projection') (Get-Content $CandidatePath -Raw | ConvertFrom-Json)
+    $projection = Join-Path $OutputRoot 'projection.json'
+    $record | ConvertTo-Json -Depth 10 | Set-Content $projection
+}
+& (Join-Path $RosRoot '.github/scripts/Stage-RosRuntime.ps1') -RosRoot $RosRoot -WrapperRoot $WrapperRoot -PayloadRoot $payload -ProjectionPath $projection -ToolsRoot $ToolsRoot -Destination $runtime
 Push-Location $runtime
 try {
     & $PythonExe -m unittest discover -s tests -v
