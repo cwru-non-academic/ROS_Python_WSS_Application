@@ -13,7 +13,7 @@ if ($e.sdk -cne $config.dotnet_sdk -or $e.python -cne $config.python_version -or
 $projection=Get-Content -LiteralPath (Join-Path $Root 'projection.json') -Raw | ConvertFrom-Json
 Assert-PythonSameCandidate $projection.candidate $e.candidate
 if ($projection.schema -cne 'wss-python-projection/v1' -or (Get-PythonProjectionDigest $projection.files) -cne $e.projection_sha256 -or
-    $projection.projection_sha256 -cne $e.projection_sha256 -or @(Compare-Object $PythonProjectionFiles @($projection.files.source) -CaseSensitive).Count) { throw 'Projection/evidence mismatch.' }
+    $projection.projection_sha256 -cne $e.projection_sha256 -or @(Compare-Object @(Get-PythonProjectionFiles $projection) @($projection.files.source) -CaseSensitive).Count) { throw 'Projection/evidence mismatch.' }
 foreach ($pair in @(@('results.xml','results_sha256'),@('dotnet.log','log_sha256'))) {
     if ((Get-FileHash -LiteralPath (Join-Path $Root $pair[0])).Hash.ToLowerInvariant() -cne $e.($pair[1])) { throw 'Canonical result/log hash mismatch.' }
 }
@@ -22,6 +22,14 @@ foreach ($pair in @(@('ros-model.json','ros_model_sha256'),@('ros-native-symlink
 }
 $e | Add-Member -NotePropertyName native_ros_distribution -NotePropertyValue humble -Force
 Assert-PythonRosReports $e $Root
+foreach ($name in @('ros-native-symlink.json','ros-native-copy.json')) {
+    $native = Get-Content (Join-Path $Root $name) -Raw | ConvertFrom-Json
+    if ($native.installed_payload.projection_sha256 -cne $projection.projection_sha256 -or
+        $native.installed_payload.verified_files -ne $projection.files.Count -or
+        $native.installed_payload.projection_record_sha256 -cne (Get-FileHash (Join-Path $Root 'projection.json')).Hash.ToLowerInvariant()) {
+        throw "Installed ROS layout does not prove the exact complete attested projection: $name"
+    }
+}
 $actual=@(Get-ChildItem -LiteralPath $Root -Recurse -File | ForEach-Object { [IO.Path]::GetRelativePath($Root,$_.FullName).Replace('\','/') })
 if (@(Compare-Object @(Get-PythonEvidenceFiles ros) $actual -CaseSensitive).Count) { throw 'ROS evidence must contain exactly seven files.' }
 $e | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $Root 'evidence.json')

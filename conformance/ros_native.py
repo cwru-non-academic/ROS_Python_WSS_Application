@@ -14,7 +14,16 @@ import wss_py_wrapper
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--output", type=Path, required=True)
+parser.add_argument("--projection", type=Path, required=True)
 args = parser.parse_args()
+# The transfer manifest was hash-bound to the independently validated Windows
+# projection. Verify every installed byte in both colcon layouts, including dylib.
+from hfi_ros_wss_driver.payload_verification import verify_installed_payload
+from ament_index_python.packages import get_package_share_directory
+installed_payload = verify_installed_payload(
+    Path(get_package_share_directory("hfi_ros_wss_driver")) / "HFI_WSS_Python_Interface" / "Cs_Libraries", args.projection
+)
+
 
 
 class Recorder:
@@ -49,7 +58,7 @@ with tempfile.TemporaryDirectory() as directory:
             raise AssertionError(f"Missing DDS channel callbacks: {recorder.calls}")
         assert "clr" not in __import__("sys").modules
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(json.dumps({"schema": "wss-ros-native/v1", "passed": True, "execution": "actual rclpy/DDS, actual wrapper forwarding, managed recording double; no CLR or transport", "channels": sorted({ch for ch, _ in recorder.calls}), "wrapper_file": wss_py_wrapper.__file__, "application_root": str(application_root())}, indent=2))
+        args.output.write_text(json.dumps({"schema": "wss-ros-native/v1", "passed": True, "execution": "actual rclpy/DDS, actual wrapper forwarding, managed recording double; no CLR or transport", "installed_payload": installed_payload, "channels": sorted({ch for ch, _ in recorder.calls}), "wrapper_file": wss_py_wrapper.__file__, "application_root": str(application_root())}, indent=2))
         node._controller._wss = None
     finally:
         if node is not None:

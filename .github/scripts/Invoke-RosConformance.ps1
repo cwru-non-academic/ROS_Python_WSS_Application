@@ -98,5 +98,9 @@ $evidence=[ordered]@{
     log_sha256=(Get-FileHash -LiteralPath $logPath).Hash.ToLowerInvariant()
 }
 $evidence | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $OutputRoot 'evidence.json')
-$projection | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $OutputRoot 'projection.json')
+if ($Mode -ceq 'committed') {
+    Copy-Item -LiteralPath (Join-Path $WrapperRoot '.github/python-candidate.json') -Destination (Join-Path $OutputRoot 'projection.json')
+} else {
+    $projection | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $OutputRoot 'projection.json')
+}
 Write-Output 'PASS: Python via pythonnet through shared production commands; ten canonical cases, eighteen unchanged assertion expressions; Production Python executed; emulator only, no terminal input or physical hardware.'
