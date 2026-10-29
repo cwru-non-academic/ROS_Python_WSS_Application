@@ -54,7 +54,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 94d78c49a622bd4d15587f869c4cd5ac063c13b8
+          ref: 733d661baf2d259688fe0623bba0ae9adc1ce9ad
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4
@@ -192,7 +192,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 94d78c49a622bd4d15587f869c4cd5ac063c13b8
+          ref: 733d661baf2d259688fe0623bba0ae9adc1ce9ad
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4
@@ -334,7 +334,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 94d78c49a622bd4d15587f869c4cd5ac063c13b8
+          ref: 733d661baf2d259688fe0623bba0ae9adc1ce9ad
           path: tools
           persist-credentials: false
       - uses: actions/download-artifact@v4
@@ -356,3 +356,15 @@ jobs:
           name: python-preflight-evidence
           if-no-files-found: error
           path: ${{ runner.temp }}/ros-evidence/
+      - name: Add normalized candidate binding after all existing proofs passed
+        shell: pwsh
+        env:
+          CANDIDATE_JSON: ${{ inputs.candidate_json }}
+        run: |
+          ./tools/.github/scripts/Write-CandidateProvenance.ps1 -CandidateJson $env:CANDIDATE_JSON -EvidenceRoot "$env:RUNNER_TEMP/ros-evidence" -OutputPath "$env:RUNNER_TEMP/candidate-provenance/candidate.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wss-candidate-provenance
+          retention-days: 90
+          if-no-files-found: error
+          path: ${{ runner.temp }}/candidate-provenance/candidate.json
