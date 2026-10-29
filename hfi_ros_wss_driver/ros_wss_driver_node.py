@@ -156,7 +156,7 @@ class RosWssDriverNode(Node):
         if selected in ("test", "conformance"):
             target = "in-memory"
         self.get_logger().info(
-            "WSS driver ready. "
+            "WSS driver initialized; device setup continues asynchronously. "
             f"Config={config_path}, Log={log_path}, Transport={selected}, Target={target}, "
             f"TestMode={test_mode}, MaxRetries={config.max_setup_tries}, TickMs={config.tick_interval_ms}, "
             f"MaxWSS={self._max_wss_for_topic_count(len(configured_topics))}"

@@ -56,8 +56,27 @@ with TemporaryDirectory(prefix="wss-ros-transport-check-") as directory:
                 transport.Dispose()
             node.destroy_node()
     Node.overrides = {}
+# Exercise the schema in the actual bundled Core assembly, using disposable copies.
+from Wss.CoreModule import CoreConfig, CoreConfigController
+with TemporaryDirectory(prefix="wss-address-schema-") as directory:
+    address_path = Path(directory) / "stimConfig.json"
+    template = json.loads((ROOT / "Config" / "stimConfig.json").read_text())
+    defaults = CoreConfig()
+    assert int(template["broadcastTarget"], 16) == int(defaults.broadcastTarget, 16)
+    assert [int(value, 16) for value in template["wssTargets"]] == [int(value, 16) for value in defaults.wssTargets]
+    for label, configuration, expected in (
+        ("template", template, (0x8F, [0x81, 0x82, 0x83])),
+        ("legacy", {key: value for key, value in template.items() if key not in ("broadcastTarget", "wssTargets")}, (0x8F, [0x81, 0x82, 0x83])),
+        ("custom", {**template, "broadcastTarget": "0x8E", "wssTargets": ["0x80", "0x82", "0x83"]}, (0x8E, [0x80, 0x82, 0x83])),
+    ):
+        address_path.write_text(json.dumps(configuration))
+        before = address_path.read_bytes()
+        loaded = CoreConfigController(str(address_path))
+        assert (int(loaded.BroadcastTarget), [int(value) for value in loaded.WssTargets]) == expected, label
+        assert address_path.read_bytes() == before, label
+
 args.output.parent.mkdir(parents=True, exist_ok=True)
 args.output.write_text(json.dumps({"schema": "wss-ros-transport-selection/v1", "passed": True,
-    "constructed": checked, "ros_scope": "ROS APIs doubled; no native DDS assertion in this check",
+    "constructed": checked, "receiver_config": "template, legacy and custom schemas passed against bundled Core; no user-file migration", "ros_scope": "ROS APIs doubled; no native DDS assertion in this check",
     "serial_auto": "configuration tested separately; construction requires a real port inventory", "physical_io": False}, indent=2))
 print("PASS: ROS parameters reach actual Core transport constructors; no physical I/O or native ROS claim.")
