@@ -38,6 +38,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'ROS import, contract and lifecycle tests failed.' }
     & $PythonExe -u conformance/ros_emulator.py --output (Join-Path $OutputRoot 'ros-model.json')
     if ($LASTEXITCODE -ne 0) { throw 'ROS production model fixtures failed.' }
+    & $PythonExe -u conformance/transport_smoke.py --payload (Join-Path $runtime 'HFI_WSS_Python_Interface/Cs_Libraries') --output (Join-Path $OutputRoot 'transport-options.json')
+    if ($LASTEXITCODE -ne 0) { throw 'ROS production transport selection failed.' }
 } finally { Pop-Location }
 $model = Get-Content (Join-Path $OutputRoot 'ros-model.json') -Raw | ConvertFrom-Json
 if ($model.tests -ne 5 -or $model.failed -ne 0 -or $model.skipped -ne 0 -or $model.observations.Count -ne 15) {

@@ -142,6 +142,7 @@ jobs:
           path: |
             ${{ runner.temp }}/ros-platform/platform-summary.json
             ${{ runner.temp }}/ros-platform/ros-model.json
+            ${{ runner.temp }}/ros-platform/transport-options.json
             ${{ runner.temp }}/ros-platform/wrapper-platform/platform.json
             ${{ runner.temp }}/ros-platform/wrapper-platform/platform.trx
       - name: Retain the Windows model report for existing promotion evidence

@@ -31,7 +31,7 @@ class RosContractTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.config = self.root / "Config"
         self.config.mkdir()
-        self.original = {"maxWSS": 3, "firmware": "H03", "calibration_marker": [7, 8]}
+        self.original = {"maxWSS": 3, "firmware": "H03", "calibration_marker": [7, 8], "broadcastTarget": "0x8E", "wssTargets": ["0x80", "0x82", "0x83"]}
         (self.config / "stimConfig.json").write_text(json.dumps(self.original), encoding="ascii")
         self.params = b'{"stim":{"ch":{"1":{"minPW":20,"maxPW":100}}}}'
         (self.config / "stimParams.json").write_bytes(self.params)
@@ -47,9 +47,9 @@ class RosContractTests(unittest.TestCase):
 
     def test_parameter_defaults_and_topic_contract(self):
         node = self.construct()
-        self.assertEqual(set(node.parameters), {"node_name", "config_path", "log_path", "serial_port", "test_mode", "max_retries", "tick_interval_ms"} | {f"ch{i}_topic" for i in range(1, 10)})
+        self.assertEqual(set(node.parameters), {"node_name", "config_path", "log_path", "serial_port", "test_mode", "max_retries", "tick_interval_ms", "transport", "ble_device_name", "ble_device_id", "ble_auto", "conformance_mode"} | {f"ch{i}_topic" for i in range(1, 10)})
         self.assertEqual(node.parameters["node_name"], "ros_wss_driver_node")
-        for key, value in {"serial_port": "", "test_mode": False, "max_retries": 5, "tick_interval_ms": 10}.items():
+        for key, value in {"serial_port": "", "test_mode": False, "max_retries": 5, "tick_interval_ms": 10, "transport": "serial", "ble_device_name": "", "ble_device_id": "", "ble_auto": False, "conformance_mode": False}.items():
             self.assertEqual(node.parameters[key], value)
         self.assertEqual([(kind, topic, depth) for kind, topic, _, depth in node.subscriptions], [(Float64, f"/dom/ch{i}/stimulation_value", 10) for i in range(1, 10)])
 
@@ -102,6 +102,38 @@ class RosContractTests(unittest.TestCase):
         node = self.construct()
         config = node._controller._config
         self.assertEqual((config.serial_port, config.test_mode, config.max_setup_tries, config.tick_interval_ms), ("/dev/example", True, 1, 1))
+
+    def test_ble_parameters_reach_the_production_controller(self):
+        Node.overrides.update(transport="BLE", ble_device_name=" WSS ", ble_device_id="explicit-id", ble_auto=True)
+        node = self.construct()
+        config = node._controller._config
+        self.assertEqual((config.transport, config.ble_device_name, config.ble_device_id, config.ble_auto), ("ble", " WSS ", "explicit-id", True))
+
+    def test_simulated_transport_names_and_existing_alias(self):
+        for override, expected in (({"transport": "test"}, (True, False)),
+                                   ({"transport": "conformance"}, (False, True)),
+                                   ({"conformance_mode": True}, (False, True))):
+            with self.subTest(override=override):
+                Node.overrides.update(transport="serial", test_mode=False, conformance_mode=False)
+                Node.overrides.update(override)
+                node = self.construct()
+                config = node._controller._config
+                self.assertEqual((config.test_mode, config.conformance_mode), expected)
+
+    def test_invalid_transport_is_rejected_before_initialization_or_config_write(self):
+        original = (self.config / "stimConfig.json").read_bytes()
+        for override in ({"transport": "ble"}, {"transport": "ble", "ble_device_name": " "},
+                         {"transport": "ble", "ble_auto": True, "test_mode": True},
+                         {"transport": "test", "conformance_mode": True}, {"transport": "unknown"}):
+            with self.subTest(override=override):
+                Node.overrides.update(transport="serial", ble_device_name="", ble_device_id="", ble_auto=False, test_mode=False, conformance_mode=False)
+                Node.overrides.update({f"ch{i}_topic": "" for i in range(2, 10)})
+                Node.overrides.update(override)
+                with patch.object(driver.StimulationController, "Initialize") as initialize:
+                    with self.assertRaises(ValueError):
+                        driver.RosWssDriverNode()
+                    initialize.assert_not_called()
+                self.assertEqual((self.config / "stimConfig.json").read_bytes(), original)
 
     def test_callback_failure_is_logged_without_changing_subscription(self):
         node = self.construct()

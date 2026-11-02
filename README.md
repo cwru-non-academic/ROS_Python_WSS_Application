@@ -47,8 +47,9 @@ The table below lists the direct dependencies needed for this repository.
    The ROS2 YAML specifies:
    - the app-owned WSS `Config/` directory path
    - the log file path
-   - the serial port
-   - whether to use the wrapper test transport
+   - the transport (`serial`, `ble`, `test`, or `conformance`) and serial port
+   - explicit BLE selection by device name, device ID, or auto-selection
+   - whether to use the wrapper test or conformance transport
    - the WSS setup retry count
    - the WSS tick interval in milliseconds
    - up to nine ROS topic names mapped to `ch1` through `ch9`
@@ -96,6 +97,26 @@ paths are examples for an existing installation, not portable defaults.
    ros2 topic pub /dom/index/stimulation_value std_msgs/msg/Float64 "{data: 0.5}" --once
    ```
 
+Transport parameters are additive; existing YAML, topic names and publishers
+continue to work. `transport` defaults to `serial`. For BLE set `transport: ble`
+and one of `ble_device_name`, `ble_device_id`, or `ble_auto: true`. Empty BLE
+selectors are rejected rather than silently scanning. BLE cannot be combined
+with `serial_port`, `test_mode`, or `conformance_mode`.
+
+`transport: test` and `transport: conformance` select Core's in-memory transports;
+`test_mode: true` remains supported and `conformance_mode: true` is an equivalent
+explicit flag. Unlike the CLI one-shot diagnostic, the ROS node remains running
+with the application's configuration and topics in these modes. Use a suitable
+WSS configuration for the emulated firmware. Conflicting simulated modes are
+rejected before configuration files are changed or a controller is initialized.
+
+The shared wrapper selects each OS's BLE backend, including the macOS managed
+backend and paired native dylib, without a separate ROS BLE implementation.
+Use `PYTHONNET_RUNTIME=coreclr` with a compatible installed CLR where needed.
+This prepares the application transport path on macOS; native ROS Humble support
+is tested only on Ubuntu 22.04. macOS platform checks double the ROS APIs and
+exercise actual Core constructors, with no radio discovery or connection.
+
 Incoming values are clamped to the range `[0.0, 1.0]` before being sent to `StimWithMode("chN", value)`.
 
 ## Running Unit Tests
@@ -126,8 +147,10 @@ v2 wrapper/CLI/ROS proof and a fresh preflight of the actual merged wrapper.
 The three OS checks are named `ROS platform compatibility (Windows)`,
 `ROS platform compatibility (Ubuntu)` and `ROS platform compatibility (macOS)`.
 `ROS-specific compatibility (Humble)` retains the real colcon/DDS checks.
-macOS BLE is explicitly skipped because no backend is implemented; green platform
-checks do not claim native ROS support on Windows/macOS. `ROS general conformance`
+The declared macOS BLE payload is checked through the actual wrapper/backend
+loading path, including BLE name/ID/auto routing. Missing declared backend files
+fail the check; green platform checks do not claim physical BLE or native ROS
+support on Windows/macOS. `ROS general conformance`
 also verifies all suites and the existing promotion evidence format, so ordinary
 PRs have five acceptance checks. `Stage verified ROS inputs` is a staging helper.
 The unchanged candidate preflight retains its `ROS compatibility` acceptance name.
@@ -154,3 +177,28 @@ The unchanged candidate preflight retains its `ROS compatibility` acceptance nam
   also retain their historical fallback behavior because Core looks up bare keys.
   Neither behavior is repaired by this compatibility change. Calibration or Core
   behavior corrections require their own review because output can change.
+
+## Device addresses and setup diagnostics
+
+`Config/stimConfig.json` exposes Core's receiver-address settings:
+`broadcastTarget` defaults to `"0x8F"`, and `wssTargets` defaults to
+`["0x81", "0x82", "0x83"]` for logical Wss1, Wss2 and Wss3. These are receiver
+addresses, not the host sender byte. Set the targets for your actual device
+configuration (for example, an installation may need `"0x80"` for Wss1).
+Existing configurations without these fields use Core's historical defaults;
+these template changes do not rewrite existing user configuration. Core keeps
+its existing normalization behavior for invalid address values.
+Keep the firmware and calibration values appropriate to your hardware.
+
+After changing receiver addresses, stop and restart the application so Core
+constructs a new address map. The CLI `reload-core` command does not rebuild that map.
+Setup continues asynchronously after controller initialization. An initialized
+application or an advancing tick loop does not establish that a device is ready.
+Core setup and tick errors are recorded in the configured log file; check the
+reported absolute config and log paths when diagnosing connection failures.
+
+When the retained dependency payload is legacy and does not declare macOS BLE,
+the platform probe asserts that explicit BLE selection is rejected and reports
+it as unsupported. It does not count that as BLE construction or runtime proof.
+A declared macOS backend missing either its managed DLL or native bridge always
+fails; file absence alone never establishes legacy capability.

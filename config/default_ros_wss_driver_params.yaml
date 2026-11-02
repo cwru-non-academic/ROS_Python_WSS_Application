@@ -3,6 +3,11 @@ config_path: /home/lemf/Documents/GitHub/HFI_ROS_WSS_Driver/Config
 log_path: /home/lemf/Documents/GitHub/HFI_ROS_WSS_Driver/logs/wss_driver.log
 serial_port: ""
 test_mode: false
+transport: serial
+ble_device_name: ""
+ble_device_id: ""
+ble_auto: false
+conformance_mode: false
 max_retries: 5
 tick_interval_ms: 10
 ch1_topic: /dom/thumb/stimulation_value
