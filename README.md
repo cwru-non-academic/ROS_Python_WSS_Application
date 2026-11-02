@@ -196,3 +196,9 @@ Setup continues asynchronously after controller initialization. An initialized
 application or an advancing tick loop does not establish that a device is ready.
 Core setup and tick errors are recorded in the configured log file; check the
 reported absolute config and log paths when diagnosing connection failures.
+
+When the retained dependency payload is legacy and does not declare macOS BLE,
+the platform probe asserts that explicit BLE selection is rejected and reports
+it as unsupported. It does not count that as BLE construction or runtime proof.
+A declared macOS backend missing either its managed DLL or native bridge always
+fails; file absence alone never establishes legacy capability.
