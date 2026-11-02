@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
@@ -46,6 +45,11 @@ class RosWssDriverNode(Node):
         self.declare_parameter("log_path", str(self._default_log_path()))
         self.declare_parameter("serial_port", "")
         self.declare_parameter("test_mode", False)
+        self.declare_parameter("transport", "serial")
+        self.declare_parameter("ble_device_name", "")
+        self.declare_parameter("ble_device_id", "")
+        self.declare_parameter("ble_auto", False)
+        self.declare_parameter("conformance_mode", False)
         self.declare_parameter("max_retries", 5)
         self.declare_parameter("tick_interval_ms", 10)
         for channel in range(1, 10):
@@ -87,6 +91,13 @@ class RosWssDriverNode(Node):
         log_path = Path(self.get_parameter("log_path").value).expanduser().resolve()
         serial_port = self.get_parameter("serial_port").value.strip()
         test_mode = bool(self.get_parameter("test_mode").value)
+        transport = self.get_parameter("transport").value.strip().lower()
+        if transport not in ("serial", "ble", "test", "conformance"):
+            raise ValueError("transport must be serial, ble, test or conformance.")
+        ble_name = self.get_parameter("ble_device_name").value
+        ble_id = self.get_parameter("ble_device_id").value
+        ble_auto = bool(self.get_parameter("ble_auto").value)
+        conformance_mode = bool(self.get_parameter("conformance_mode").value)
         max_retries = int(self.get_parameter("max_retries").value)
         tick_interval_ms = int(self.get_parameter("tick_interval_ms").value)
         configured_topics: list[tuple[int, str]] = []
@@ -94,10 +105,6 @@ class RosWssDriverNode(Node):
             topic_name = self.get_parameter(f"ch{channel}_topic").value.strip()
             if topic_name:
                 configured_topics.append((channel, topic_name))
-
-        config_path.mkdir(parents=True, exist_ok=True)
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        self._update_max_wss_config(config_path, len(configured_topics))
 
         bundled_dlls = _repo_root() / "HFI_WSS_Python_Interface" / "Cs_Libraries"
         dlls = selected_dll_directory(bundled_dlls, self._explicit_cs_lib_dir)
@@ -115,12 +122,21 @@ class RosWssDriverNode(Node):
             config_path=config_path,
             log_path=log_path,
             cs_lib_dir=dlls,
-            test_mode=test_mode,
+            serial_port=serial_port or None,
+            transport="ble" if transport == "ble" else "serial",
+            test_mode=test_mode or transport == "test",
+            conformance_mode=conformance_mode or transport == "conformance",
+            ble_device_name=ble_name if ble_name.strip() else None,
+            ble_device_id=ble_id if ble_id.strip() else None,
+            ble_auto=ble_auto,
             max_setup_tries=max(1, max_retries),
             tick_interval_ms=max(1, tick_interval_ms),
         )
-        if serial_port:
-            config = replace(config, serial_port=serial_port)
+        # Reject conflicting selectors before changing config files or starting
+        # any controller. Existing serial/test aliases remain backward compatible.
+        config_path.mkdir(parents=True, exist_ok=True)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        self._update_max_wss_config(config_path, len(configured_topics))
 
         self._controller = create_controller(config)
         self._controller.Initialize()
@@ -135,9 +151,13 @@ class RosWssDriverNode(Node):
             self._channel_subscriptions.append(subscription)
             self.get_logger().info(f"Mapped topic '{topic_name}' to ch{channel}.")
 
+        selected = "conformance" if config.conformance_mode else "test" if config.test_mode else config.transport
+        target = (config.ble_device_id or config.ble_device_name or "auto-select") if selected == "ble" else serial_port or "auto-detect"
+        if selected in ("test", "conformance"):
+            target = "in-memory"
         self.get_logger().info(
-            "WSS driver ready. "
-            f"Config={config_path}, Log={log_path}, Serial={serial_port or 'auto-detect'}, "
+            "WSS driver initialized; device setup continues asynchronously. "
+            f"Config={config_path}, Log={log_path}, Transport={selected}, Target={target}, "
             f"TestMode={test_mode}, MaxRetries={config.max_setup_tries}, TickMs={config.tick_interval_ms}, "
             f"MaxWSS={self._max_wss_for_topic_count(len(configured_topics))}"
         )
