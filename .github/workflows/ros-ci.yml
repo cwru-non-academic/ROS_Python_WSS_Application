@@ -51,7 +51,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 94d78c49a622bd4d15587f869c4cd5ac063c13b8
+          ref: 2cabda85d2018483681f38cb03d674bbc13b05bd
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4
@@ -91,10 +91,10 @@ jobs:
         include:
           - name: Windows
             os: windows-2022
+            arch: x64
           - name: Ubuntu
             os: ubuntu-latest
-          - name: macOS
-            os: macos-15-intel
+            arch: x64
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
@@ -111,7 +111,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 94d78c49a622bd4d15587f869c4cd5ac063c13b8
+          ref: 2cabda85d2018483681f38cb03d674bbc13b05bd
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4
@@ -123,6 +123,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          architecture: ${{ matrix.arch }}
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.316'
@@ -152,6 +153,125 @@ jobs:
           name: ros-model-evidence
           if-no-files-found: error
           path: ${{ runner.temp }}/ros-platform/ros-model.json
+
+  macos-architectures:
+    name: ROS platform compatibility (${{ matrix.display }})
+    needs: payload-stage
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS-x64
+            display: macOS Intel (x64)
+            os: macos-15-intel
+            arch: x64
+          - name: macOS-arm64
+            display: macOS Apple Silicon (arm64)
+            os: macos-15
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      WSS_EXPECTED_ARCHITECTURE: ${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: source
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: cwru-non-academic/Python_WSS_Integration_Lib
+          ref: ${{ needs.payload-stage.outputs.wrapper }}
+          path: wrapper
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: cwru-non-academic/Python_WSS_Integration_Lib
+          ref: 2cabda85d2018483681f38cb03d674bbc13b05bd
+          path: tools
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: cwru-non-academic/CSharp_WSS_Integration_Lib
+          ref: 02172a64c55becd5535204f46f10b4755bf3ee05
+          path: fixture
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: ${{ matrix.arch }}
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.316'
+      - run: python -m pip install build==1.2.2.post1 pythonnet==3.0.5 PyYAML==6.0.3
+      - name: Check actual application contracts, model and platform runtime
+        shell: pwsh
+        env:
+          WRAPPER_SHA: ${{ needs.payload-stage.outputs.wrapper }}
+        run: |
+          ./source/.github/scripts/Invoke-RosPlatformCompatibility.ps1 -RosRoot "$env:GITHUB_WORKSPACE/source" -RosSha $env:GITHUB_SHA -WrapperRoot "$env:GITHUB_WORKSPACE/wrapper" -WrapperSha $env:WRAPPER_SHA -FixtureRoot "$env:GITHUB_WORKSPACE/fixture" -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -OutputRoot "$env:RUNNER_TEMP/ros-platform"
+      - name: Record native macOS architecture worker outcome
+        if: always()
+        shell: pwsh
+        env:
+          WORKER_CONCLUSION: ${{ job.status }}
+          EXPECTED_ARCHITECTURE: ${{ matrix.arch }}
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP 'ros-platform/wrapper-platform'
+          New-Item -ItemType Directory -Force -Path $root | Out-Null
+          @{schema='wss-macos-worker/v1';architecture=$env:EXPECTED_ARCHITECTURE;conclusion=$env:WORKER_CONCLUSION;repository=$env:GITHUB_REPOSITORY;run_id=$env:GITHUB_RUN_ID;source_sha=$env:GITHUB_SHA} | ConvertTo-Json | Set-Content (Join-Path $root 'outcome.json')
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ros-platform-${{ matrix.name }}
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/ros-platform/platform-summary.json
+            ${{ runner.temp }}/ros-platform/ros-model.json
+            ${{ runner.temp }}/ros-platform/transport-options.json
+            ${{ runner.temp }}/ros-platform/wrapper-platform/platform.json
+            ${{ runner.temp }}/ros-platform/wrapper-platform/python-smoke.json
+            ${{ runner.temp }}/ros-platform/wrapper-platform/outcome.json
+            ${{ runner.temp }}/ros-platform/wrapper-platform/platform.trx
+      - name: Retain the Windows model report for existing promotion evidence
+        uses: actions/upload-artifact@v4
+        if: matrix.name == 'Windows'
+        with:
+          name: ros-model-evidence
+          if-no-files-found: error
+          path: ${{ runner.temp }}/ros-platform/ros-model.json
+
+  macos-compatibility:
+    name: ROS platform compatibility (macOS)
+    if: always()
+    needs: [macos-architectures, payload-stage]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: cwru-non-academic/Python_WSS_Integration_Lib
+          ref: 2cabda85d2018483681f38cb03d674bbc13b05bd
+          path: tools
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ros-platform-macOS-*
+          path: ${{ runner.temp }}/macos-inputs
+      - name: Require native Intel and Apple Silicon consumer proofs
+        shell: pwsh
+        env:
+          MACOS_WORKER_RESULT: ${{ needs.macos-architectures.result }}
+        run: |
+          ./tools/.github/scripts/Complete-MacOSConsumer.ps1 -InputRoot "$env:RUNNER_TEMP/macos-inputs" -OutputRoot "$env:RUNNER_TEMP/macos-complete" -ArtifactPrefix 'ros-platform' -EvidenceSubdirectory 'wrapper-platform' -WorkerResult $env:MACOS_WORKER_RESULT
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ros-platform-macOS
+          retention-days: 14
+          if-no-files-found: error
+          path: ${{ runner.temp }}/macos-complete/
+
   ros-build:
     name: ROS-specific compatibility (Humble)
     needs: payload-stage
@@ -224,7 +344,7 @@ jobs:
           path: results/*.json
   general-conformance:
     name: ROS general conformance
-    needs: [payload-stage, platform-compatibility, ros-build]
+    needs: [payload-stage, platform-compatibility, macos-compatibility, ros-build]
     if: always()
     runs-on: windows-2022
     timeout-minutes: 20
@@ -234,9 +354,10 @@ jobs:
         env:
           INPUT_RESULT: ${{ needs.payload-stage.result }}
           PLATFORM_RESULT: ${{ needs.platform-compatibility.result }}
+          MACOS_RESULT: ${{ needs.macos-compatibility.result }}
           ROS_RESULT: ${{ needs.ros-build.result }}
         run: |
-          if ($env:INPUT_RESULT -cne 'success' -or $env:PLATFORM_RESULT -cne 'success' -or $env:ROS_RESULT -cne 'success') {
+          if ($env:INPUT_RESULT -cne 'success' -or $env:PLATFORM_RESULT -cne 'success' -or $env:MACOS_RESULT -cne 'success' -or $env:ROS_RESULT -cne 'success') {
             throw 'Verified inputs, every platform suite and native ROS must succeed.'
           }
       - uses: actions/checkout@v4
@@ -270,7 +391,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 94d78c49a622bd4d15587f869c4cd5ac063c13b8
+          ref: 2cabda85d2018483681f38cb03d674bbc13b05bd
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4

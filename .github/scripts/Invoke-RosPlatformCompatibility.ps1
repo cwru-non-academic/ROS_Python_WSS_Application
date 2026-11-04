@@ -50,7 +50,7 @@ Assert-PythonSource $WrapperRoot $WrapperSha
 $platform = Get-Content (Join-Path $OutputRoot 'wrapper-platform/platform.json') -Raw | ConvertFrom-Json
 @{
     schema='wss-ros-platform/v1'; ros_sha=$RosSha; wrapper_sha=$WrapperSha
-    os=$platform.os; projection_sha256=$platform.projection_sha256
+    os=$platform.os; architecture=$platform.architecture; execution=$platform.execution; projection_sha256=$platform.projection_sha256
     scope='actual Python application contracts, import/layout selection, wrapper/Core model and installed wrapper platform loading; ROS APIs doubled'
     native_ros='not exercised in this job; real Humble colcon/rclpy/DDS is tested separately on Ubuntu 22.04'
     ble=$platform.ble; model_tests=$model.tests; model_observations=$model.observations.Count
