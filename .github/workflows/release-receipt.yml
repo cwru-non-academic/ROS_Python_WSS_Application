@@ -30,13 +30,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: d2ab8d1b14d2e0dab314dcda8c28d5d65a95ff9c
+          ref: e71f757caa89c5110cbce3a625c4999008053d9d
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/WSSCore
-          ref: 8caa238c7ccfb7825695e1b8fb69602519935442
+          ref: ff13b4064798df54661f50e6d13b2fc8d562af9c
           path: contract
           persist-credentials: false
       - uses: actions/setup-node@v4
