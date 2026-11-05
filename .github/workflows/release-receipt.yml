@@ -30,7 +30,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: c969bd210c1612dc94a9e0f537df973261909afa
+          ref: 4521613359b88e440c022ae0116832eabe353b8a
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4
