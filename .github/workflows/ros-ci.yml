@@ -13,6 +13,28 @@ concurrency:
   group: ros-committed-${{ inputs.correlation_id || github.ref }}
   cancel-in-progress: false
 jobs:
+  preflight-context-contracts:
+    name: ROS candidate boundary (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install PyYAML==6.0.3
+      - name: Exercise actual candidate guards without credentials or artifact operations
+        shell: pwsh
+        run: ./.github/scripts/tests/RosPreflightContext.Tests.ps1
   payload-stage:
     name: Stage verified ROS inputs
     runs-on: windows-2022

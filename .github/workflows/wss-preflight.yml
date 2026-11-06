@@ -9,6 +9,9 @@ on:
       correlation_id: {required: true, type: string}
 env:
   ROS_MODE: candidate
+  WSS_CI_CHANNEL: ${{ github.ref_name }}
+  WSS_TARGET_ROOT: ${{ github.workspace }}/source
+  WSS_CORE_TOOLS_ROOT: ${{ github.workspace }}/workflow-guard
 permissions:
   contents: read
 concurrency:
@@ -28,7 +31,11 @@ jobs:
           ref: ${{ inputs.ros_sha || github.sha }}
           path: source
           persist-credentials: false
-      - name: Require exact source, candidate inputs and correlation before credentials
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - &ros_candidate_context
+        name: Require exact ROS candidate context before credentials
         id: sources
         shell: pwsh
         env:
@@ -37,20 +44,57 @@ jobs:
           CANDIDATE_JSON: ${{ inputs.candidate_json }}
           CORRELATION: ${{ inputs.correlation_id }}
         run: |
-          $source = (git -C source rev-parse HEAD).Trim()
-          if ($source -cne $env:GITHUB_SHA) { throw 'ROS source differs from exact workflow source.' }
-          if ($env:ROS_MODE -ceq 'candidate') {
-            if ($env:GITHUB_REF -cne 'refs/heads/dev' -or $env:ROS_SHA -cne $source -or $env:WRAPPER_SHA -cnotmatch '^[0-9a-f]{40}$') { throw 'Candidate preflight requires exact dev sources.' }
-            $c = $env:CANDIDATE_JSON | ConvertFrom-Json
-            $expected = "wss-$($c.run_id)-$($c.artifact_id)-$($env:WRAPPER_SHA)-$source"
-            if ($env:CORRELATION -cne $expected) { throw 'Candidate/source correlation mismatch.' }
-            $wrapper = $env:WRAPPER_SHA
-          } else {
-            $entry = git -C source ls-tree HEAD -- HFI_WSS_Python_Interface
-            if ($entry -cnotmatch '^160000 commit ([0-9a-f]{40})\s+HFI_WSS_Python_Interface$') { throw 'Missing committed wrapper gitlink.' }
-            $wrapper = $Matches[1]
-          }
-          "wrapper=$wrapper" >> $env:GITHUB_OUTPUT
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_ACTIONS -cne 'true' -or $env:GITHUB_REPOSITORY -cne 'cwru-non-academic/ROS_Python_WSS_Application' -or $env:GITHUB_EVENT_NAME -cne 'workflow_dispatch' -or $env:ROS_MODE -cne 'candidate') { throw 'Candidate preflight requires its registered ROS dispatch.' }
+          $paths = & node --input-type=module -e 'import {realpathSync} from "node:fs"; console.log(JSON.stringify(process.argv.slice(1).map(p => realpathSync(p))));' (Join-Path $env:GITHUB_WORKSPACE 'source') $env:WSS_TARGET_ROOT
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve the verified ROS target root.' }
+          $roots = ($paths -join "`n") | ConvertFrom-Json
+          if ($roots.Count -ne 2 -or $roots[0] -cne $roots[1]) { throw 'Target root differs from the verified ROS checkout.' }
+          $root = $roots[0]
+          . (Join-Path $root '.github/scripts/wss-ci/Channel.ps1')
+          $context = Get-WssCiChannelContext
+          Assert-WssCiTargetRef $context.channel
+          if ($env:GITHUB_WORKFLOW_REF -cne "$($env:GITHUB_REPOSITORY)/.github/workflows/wss-preflight.yml@$($context.ref)") { throw 'Candidate preflight workflow identity differs.' }
+          $source = (& git -C $root rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $source -cnotmatch '^[0-9a-f]{40}$' -or $source -cne $env:GITHUB_SHA -or $source -cne $env:GITHUB_WORKFLOW_SHA -or $env:ROS_SHA -cne $source) { throw 'ROS source differs from the exact workflow source.' }
+          $dirty = & git -C $root status --porcelain --untracked-files=no
+          if ($LASTEXITCODE -ne 0 -or $dirty) { throw 'ROS candidate source must be clean.' }
+          if ($env:WRAPPER_SHA -cnotmatch '^[0-9a-f]{40}$') { throw 'Candidate preflight requires an exact wrapper source.' }
+          $config = Get-Content -LiteralPath (Join-Path $root '.github/python-ci.json') -Raw | ConvertFrom-Json
+          if ($config.schema -cne 'wss-python-ci/v1' -or $config.baseline_ready -ne $true -or $config.automated_execution -cne 'pythonnet' -or $config.dotnet_sdk -cne '9.0.316' -or @($config.channels) -cnotcontains $context.channel) { throw 'Requested candidate channel capability has not been adopted.' }
+          $raw = & node --input-type=module -e 'import {pathToFileURL} from "node:url"; const v=await import(pathToFileURL(process.argv[1])); const c=JSON.parse(process.argv[2]); v.candidate(c); console.log(JSON.stringify(c));' (Join-Path $root '.github/scripts/wss-ci/verify.mjs') $env:CANDIDATE_JSON
+          if ($LASTEXITCODE -ne 0) { throw 'Canonical candidate identity is invalid.' }
+          $c = ($raw -join "`n") | ConvertFrom-Json
+          if ($env:CORRELATION -cne "wss-$($c.run_id)-$($c.artifact_id)-$($env:WRAPPER_SHA)-$source") { throw 'Candidate/source correlation mismatch.' }
+          "wrapper=$($env:WRAPPER_SHA)" >> $env:GITHUB_OUTPUT
+      - &ros_guard_lock
+        name: Read ROS-owned locked Core guard source
+        id: guard
+        shell: pwsh
+        run: |
+          $lock = Get-Content -LiteralPath (Join-Path $env:WSS_TARGET_ROOT '.github/scripts/wss-ci.lock.json') -Raw | ConvertFrom-Json
+          if ($lock.repository -cne $env:GITHUB_REPOSITORY -or $lock.source_repository -cne 'cwru-non-academic/WSSCore' -or $lock.source_commit -cnotmatch '^[a-f0-9]{40}$' -or $lock.source_ref -cne "refs/heads/ci/tooling/$($lock.source_commit)") { throw 'Invalid ROS-owned immutable Core guard lock.' }
+          "commit=$($lock.source_commit)" >> $env:GITHUB_OUTPUT
+      - &ros_guard_checkout
+        uses: actions/checkout@v4
+        with:
+          repository: cwru-non-academic/WSSCore
+          ref: ${{ steps.guard.outputs.commit }}
+          path: workflow-guard
+          persist-credentials: false
+      - &ros_guard_identity
+        name: Verify locked Core guard checkout before credentials
+        shell: pwsh
+        run: |
+          $paths = & node --input-type=module -e 'import {realpathSync} from "node:fs"; console.log(JSON.stringify(process.argv.slice(1).map(p => realpathSync(p))));' (Join-Path $env:GITHUB_WORKSPACE 'workflow-guard') $env:WSS_CORE_TOOLS_ROOT
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve the locked Core guard root.' }
+          $roots = ($paths -join "`n") | ConvertFrom-Json
+          if ($roots.Count -ne 2 -or $roots[0] -cne $roots[1]) { throw 'Core guard root differs from its declared checkout.' }
+          $lock = Get-Content -LiteralPath (Join-Path $env:WSS_TARGET_ROOT '.github/scripts/wss-ci.lock.json') -Raw | ConvertFrom-Json
+          $head = (& git -C $roots[0] rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $head -cne $lock.source_commit) { throw 'Core guard revision differs from the ROS-owned lock.' }
+          $dirty = & git -C $roots[0] status --porcelain --untracked-files=no
+          if ($LASTEXITCODE -ne 0 -or $dirty) { throw 'Core guard checkout must be clean.' }
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
@@ -183,6 +227,13 @@ jobs:
           ref: ${{ inputs.ros_sha }}
           path: source
           persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - *ros_candidate_context
+      - *ros_guard_lock
+      - *ros_guard_checkout
+      - *ros_guard_identity
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
@@ -270,6 +321,13 @@ jobs:
           ref: ${{ inputs.ros_sha }}
           path: source
           persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - *ros_candidate_context
+      - *ros_guard_lock
+      - *ros_guard_checkout
+      - *ros_guard_identity
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
