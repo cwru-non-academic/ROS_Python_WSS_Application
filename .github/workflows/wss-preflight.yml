@@ -51,14 +51,15 @@ jobs:
           $roots = ($paths -join "`n") | ConvertFrom-Json
           if ($roots.Count -ne 2 -or $roots[0] -cne $roots[1]) { throw 'Target root differs from the verified ROS checkout.' }
           $root = $roots[0]
-          . (Join-Path $root '.github/scripts/wss-ci/Channel.ps1')
-          $context = Get-WssCiChannelContext
-          Assert-WssCiTargetRef $context.channel
-          if ($env:GITHUB_WORKFLOW_REF -cne "$($env:GITHUB_REPOSITORY)/.github/workflows/wss-preflight.yml@$($context.ref)") { throw 'Candidate preflight workflow identity differs.' }
+          if ($env:GITHUB_REF -cnotin @('refs/heads/dev','refs/heads/main')) { throw 'Target workflow ref is outside the registered ROS channels.' }
+          if ($env:GITHUB_WORKFLOW_REF -cne "$($env:GITHUB_REPOSITORY)/.github/workflows/wss-preflight.yml@$($env:GITHUB_REF)") { throw 'Candidate preflight workflow identity differs.' }
           $source = (& git -C $root rev-parse HEAD).Trim()
           if ($LASTEXITCODE -ne 0 -or $source -cnotmatch '^[0-9a-f]{40}$' -or $source -cne $env:GITHUB_SHA -or $source -cne $env:GITHUB_WORKFLOW_SHA -or $env:ROS_SHA -cne $source) { throw 'ROS source differs from the exact workflow source.' }
           $dirty = & git -C $root status --porcelain --untracked-files=no
           if ($LASTEXITCODE -ne 0 -or $dirty) { throw 'ROS candidate source must be clean.' }
+          . (Join-Path $root '.github/scripts/wss-ci/Channel.ps1')
+          $context = Get-WssCiChannelContext
+          Assert-WssCiTargetRef $context.channel
           if ($env:WRAPPER_SHA -cnotmatch '^[0-9a-f]{40}$') { throw 'Candidate preflight requires an exact wrapper source.' }
           $config = Get-Content -LiteralPath (Join-Path $root '.github/python-ci.json') -Raw | ConvertFrom-Json
           if ($config.schema -cne 'wss-python-ci/v1' -or $config.baseline_ready -ne $true -or $config.automated_execution -cne 'pythonnet' -or $config.dotnet_sdk -cne '9.0.316' -or @($config.channels) -cnotcontains $context.channel) { throw 'Requested candidate channel capability has not been adopted.' }
