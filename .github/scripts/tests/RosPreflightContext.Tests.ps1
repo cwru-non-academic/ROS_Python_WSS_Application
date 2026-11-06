@@ -88,6 +88,18 @@ function Expand-ContextValue([string]$Value, $Frame) {
 function Run-Boundary($Document, [string]$JobName, $Fixture, [string]$Channel, [string]$Mutation='') {
     foreach ($key in $environmentKeys) { [Environment]::SetEnvironmentVariable($key, $null) }
     $wiring = Get-Wiring $Document $JobName
+    if ($Mutation -like 'poisoned-*') {
+        $Fixture['trustedSha']=$Fixture.sourceSha
+        $channelPath=Join-Path $Fixture.source '.github/scripts/wss-ci/Channel.ps1'
+        $probe=@'
+[IO.File]::WriteAllText((Join-Path $env:GITHUB_WORKSPACE 'UNTRUSTED_HELPER_EXECUTED'), 'input-selected PowerShell helper executed')
+'@
+        [IO.File]::WriteAllText($channelPath, $probe+"`n"+[IO.File]::ReadAllText($channelPath), [Text.UTF8Encoding]::new($false))
+        $verifyPath=Join-Path $Fixture.source '.github/scripts/wss-ci/verify.mjs'
+        $nodeProbe="import {writeFileSync as __rosSourceTripwire} from 'node:fs'; __rosSourceTripwire(process.env.GITHUB_WORKSPACE+'/UNTRUSTED_HELPER_EXECUTED','input-selected Node helper executed');"
+        [IO.File]::WriteAllText($verifyPath, $nodeProbe+"`n"+[IO.File]::ReadAllText($verifyPath), [Text.UTF8Encoding]::new($false))
+        if ($Mutation -ne 'poisoned-dirty') { $Fixture.sourceSha=Commit-Fixture $Fixture.source }
+    }
     $candidate = @{repository='cwru-non-academic/WSSCore';commit=('b'*40);run_id='11';artifact_id='22';archive='WSS-Universal-ci.zip';sha256=('c'*64)} | ConvertTo-Json -Compress
     $wrapper = 'a'*40
     $frame = @{'github.ref_name'=$Channel;'github.workspace'=$Fixture.workspace;'matrix.arch'='x64';'inputs.wrapper_sha'=$wrapper;'inputs.ros_sha'=$Fixture.sourceSha;'inputs.candidate_json'=$candidate;'inputs.correlation_id'="wss-11-22-$wrapper-$($Fixture.sourceSha)"}
@@ -129,6 +141,11 @@ function Run-Boundary($Document, [string]$JobName, $Fixture, [string]$Channel, [
         }
         'dirty-guard' { [IO.File]::WriteAllText((Join-Path $Fixture.core 'fixture.txt'),'changed') }
         'not-actions' { $env:GITHUB_ACTIONS='false' }
+        'poisoned-source' { $env:GITHUB_SHA=$Fixture.trustedSha; $env:GITHUB_WORKFLOW_SHA=$Fixture.trustedSha }
+        'poisoned-workflow-source' { $env:GITHUB_WORKFLOW_SHA=$Fixture.trustedSha }
+        'poisoned-input-source' { $env:ROS_SHA=$Fixture.trustedSha }
+        'poisoned-ref' { $env:GITHUB_REF='refs/heads/feature'; $env:GITHUB_WORKFLOW_REF="$($env:GITHUB_REPOSITORY)/.github/workflows/wss-preflight.yml@$($env:GITHUB_REF)" }
+        'poisoned-workflow' { $env:GITHUB_WORKFLOW_REF="$($env:GITHUB_REPOSITORY)/.github/workflows/other.yml@$($env:GITHUB_REF)" }
     }
     & ([scriptblock]::Create($wiring.source.run))
     & ([scriptblock]::Create($wiring.lock.run))
@@ -146,6 +163,7 @@ function Expect-Rejection($Document, [string]$JobName, $Fixture, [string]$Channe
         $rejected=$true
     }
     if (!$rejected) { throw "Candidate boundary accepted $JobName/$Mutation" }
+    if (Test-Path -LiteralPath (Join-Path $Fixture.workspace 'UNTRUSTED_HELPER_EXECUTED')) { throw "Source helper executed before identity rejection: $JobName/$Mutation" }
 }
 
 try {
@@ -161,8 +179,22 @@ try {
             'wrong-input-source'='exact workflow source'; 'wrong-wrapper'='exact wrapper source'; 'wrong-correlation'='correlation mismatch';
             'malformed-candidate'='Canonical candidate identity'; 'target-root-swap'='verified ROS checkout';
             'guard-root-swap'='declared checkout'; 'guard-revision'='revision differs'; 'dirty-guard'='must be clean'; 'not-actions'='registered ROS dispatch'
+            'poisoned-source'='exact workflow source'; 'poisoned-workflow-source'='exact workflow source'; 'poisoned-input-source'='exact workflow source';
+            'poisoned-ref'='Target workflow ref'; 'poisoned-workflow'='workflow identity'; 'poisoned-dirty'='source must be clean'
         }
         foreach ($caseName in $cases.Keys) { Expect-Rejection $workflow $jobName (New-Fixture) 'main' $caseName $cases[$caseName] }
+        # Prove the behavioral regression detects the previous unsafe ordering:
+        # this deliberately bad fixture imports the alternate helper too early.
+        $earlyImport=$workflow|ConvertTo-Json -Depth 100|ConvertFrom-Json -AsHashtable
+        $sourceLine='$source = (& git -C $root rev-parse HEAD).Trim()'
+        $tripwireImport='. (Join-Path $root ''.github/scripts/wss-ci/Channel.ps1'')'
+        foreach($step in $earlyImport.jobs[$jobName].steps){if($step.Contains('id') -and $step.id -eq 'sources'){$step.run=$step.run.Replace($sourceLine,$tripwireImport+"`n"+$sourceLine)}}
+        $detected=$false
+        try { Expect-Rejection $earlyImport $jobName (New-Fixture) 'main' 'poisoned-source' 'exact workflow source' } catch {
+            if ($_.Exception.Message -notmatch 'Source helper executed before identity rejection') { throw }
+            $detected=$true
+        }
+        if (!$detected) { throw 'Ordering regression did not detect early helper execution.' }
         $fixture=New-Fixture
         $configPath=Join-Path $fixture.source '.github/python-ci.json'
         $config=Get-Content $configPath -Raw|ConvertFrom-Json -AsHashtable; $config.channels=@('dev'); Write-Json $configPath $config
