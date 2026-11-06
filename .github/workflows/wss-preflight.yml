@@ -54,7 +54,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 27e764c7db02b5fa4550c166a470039b867e2ced
+          ref: 7df83b26db1b6a89293f9c37a74ec6491433ceb4
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4
@@ -192,7 +192,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 27e764c7db02b5fa4550c166a470039b867e2ced
+          ref: 7df83b26db1b6a89293f9c37a74ec6491433ceb4
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4
@@ -279,7 +279,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 27e764c7db02b5fa4550c166a470039b867e2ced
+          ref: 7df83b26db1b6a89293f9c37a74ec6491433ceb4
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4
@@ -355,7 +355,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 27e764c7db02b5fa4550c166a470039b867e2ced
+          ref: 7df83b26db1b6a89293f9c37a74ec6491433ceb4
           path: tools
           persist-credentials: false
       - uses: actions/download-artifact@v4
@@ -467,7 +467,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 27e764c7db02b5fa4550c166a470039b867e2ced
+          ref: 7df83b26db1b6a89293f9c37a74ec6491433ceb4
           path: tools
           persist-credentials: false
       - uses: actions/download-artifact@v4
