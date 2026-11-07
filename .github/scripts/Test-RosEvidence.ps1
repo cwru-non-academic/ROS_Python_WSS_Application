@@ -1,4 +1,14 @@
-param([Parameter(Mandatory)][string]$ToolsRoot,[Parameter(Mandatory)][string]$Root)
+param(
+    [Parameter(Mandatory)][string]$ToolsRoot,[Parameter(Mandatory)][string]$ToolsSha,
+    [Parameter(Mandatory)][string]$WrapperRoot,[Parameter(Mandatory)][string]$WrapperSha,
+    [Parameter(Mandatory)][string]$Root
+)
+$ErrorActionPreference='Stop'
+function Complete-ProfiledEvidence([string]$EvidenceRoot) {
+    & (Join-Path $PSScriptRoot 'Complete-ProfiledRosEvidence.ps1') -ToolsRoot $ToolsRoot -ToolsSha $ToolsSha -WrapperRoot $WrapperRoot -WrapperSha $WrapperSha -Root $EvidenceRoot
+}
+# Prove the unchanged real evidence is accepted by the same validator used below.
+Complete-ProfiledEvidence $Root
 . (Join-Path $ToolsRoot '.github/scripts/PythonPromotion.ps1')
 function Require-Rejection([string]$Name,[scriptblock]$Check) {
     $rejected=$false
@@ -31,7 +41,10 @@ foreach ($case in @('hash','model-skip','native-channel','model-scenario')) {
     }
     Require-Rejection $case { Assert-PythonRosReports $proof $copy }
 }
-if (@(Get-PythonEvidenceFiles ros).Count -ne 7 -or @(Get-PythonEvidenceJobs ros).Count -ne 3) { throw 'ROS role contract changed.' }
+$receiptFiles=@('evidence.json','results.xml','dotnet.log','projection.json','multi/evidence.json','multi/results.xml','multi/dotnet.log','multi/projection.json','ros-model.json','ros-native-symlink.json','ros-native-copy.json')
+$receiptJobs=@('ROS compatibility','ROS model and contract fixtures (Windows development host)','ROS colcon and installed DDS fixture (Humble development baseline)')
+if (@(Compare-Object $receiptFiles @(Get-PythonEvidenceFiles ros) -CaseSensitive).Count -or
+    @(Compare-Object $receiptJobs @(Get-PythonEvidenceJobs ros) -CaseSensitive).Count) { throw 'ROS role contract changed.' }
 Write-Output 'ROS negative evidence checks passed; these are rejection tests, not promotion approval.'
 
 foreach ($case in @('installed-count','installed-record-hash','installed-digest')) {
@@ -43,5 +56,5 @@ foreach ($case in @('installed-count','installed-record-hash','installed-digest'
     elseif ($case -ceq 'installed-record-hash') { $report.installed_payload.projection_record_sha256=('0'*64) }
     else { $report.installed_payload.projection_sha256=('0'*64) }
     $report | ConvertTo-Json -Depth 10 | Set-Content $path
-    Require-Rejection $case { & (Join-Path $PSScriptRoot 'Complete-RosEvidence.ps1') -ToolsRoot $ToolsRoot -Root $copy }
+    Require-Rejection $case { Complete-ProfiledEvidence $copy }
 }
