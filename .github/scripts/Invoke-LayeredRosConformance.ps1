@@ -10,6 +10,7 @@ param(
     [ValidateSet('committed','candidate')][string]$Mode='committed',
     [ValidateSet('ros')][string]$Role='ros',
     [ValidateSet('all','single','multi')][string]$Stage='all',
+    [string]$TestRoot='',
     [string]$ArtifactRoot='',
     [string]$CandidatePath='',
     [string]$PythonExe='python',
@@ -76,9 +77,14 @@ New-Item -ItemType Directory -Path $stagedWrapper | Out-Null
 Copy-Item -LiteralPath (Join-Path $WrapperRoot 'src') -Destination $stagedWrapper -Recurse
 $env:WSS_PYTHON_SOURCE=Join-Path $stagedWrapper 'src'
 $env:WSS_ROS_SOURCE=$staged
-$env:WSS_ROS_FIXTURES=Join-Path $RosRoot 'tests'
+if($TestRoot){
+    $fixtures=Join-Path $OutputRoot 'selected-fixtures'
+    New-Item -ItemType Directory -Path $fixtures | Out-Null
+    Copy-Item -LiteralPath (Join-Path $TestRoot 'tests/ros_stubs.py') -Destination $fixtures
+    $env:WSS_ROS_FIXTURES=$fixtures
+}else{$env:WSS_ROS_FIXTURES=Join-Path $RosRoot 'tests'}
 $env:WSS_PYTHON_PAYLOAD=$projectionRoot
-& (Join-Path $RosRoot 'conformance/Prepare-LayeredRosHarness.ps1') -CSharpIntegrationRoot $FixtureRoot -Destination $harness -ProjectionRoot $projectionRoot -Role ros -RosRoot $RosRoot -PythonRuntimeAssembly $pythonInfo.assembly
+& (Join-Path $PSScriptRoot '../../conformance/Prepare-LayeredRosHarness.ps1') -CSharpIntegrationRoot $FixtureRoot -Destination $harness -ProjectionRoot $projectionRoot -Role ros -RosRoot $RosRoot -PythonRuntimeAssembly $pythonInfo.assembly -TestRoot $TestRoot
 if (!$?) { throw 'Portable harness preparation failed.' }
 Push-Location $harness
 try { $sdk=(& dotnet --version).Trim(); if ($LASTEXITCODE -ne 0 -or $sdk -cne $config.dotnet_sdk) { throw 'Wrong .NET SDK.' } } finally { Pop-Location }

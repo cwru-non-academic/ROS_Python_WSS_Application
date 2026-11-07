@@ -4,6 +4,7 @@ param(
     [Parameter(Mandatory)][string]$ProjectionRoot,
     [ValidateSet('ros')][string]$Role='ros',
     [string]$RosRoot='',
+    [string]$TestRoot='',
     [Parameter(Mandatory)][string]$PythonRuntimeAssembly
 )
 $ErrorActionPreference='Stop'
@@ -26,7 +27,8 @@ $adapted="using StimulationController = DotNetConformanceAdapter;`n"+[regex]::Re
 $assertions=@([regex]::Matches($canonical,'Assert\.That\(.*?;','Singleline').Value)
 if ($assertions.Count -ne 20 -or ($assertions -join "`n") -cne (@([regex]::Matches($adapted,'Assert\.That\(.*?;','Singleline').Value) -join "`n")) { throw 'Canonical assertion expressions changed.' }
 New-Item -ItemType Directory -Path $target | Out-Null
-$sources=@((Join-Path $PSScriptRoot 'RosConformanceAdapter.cs'))
+$adapterRoot=if($TestRoot){Join-Path $TestRoot 'conformance'}else{$PSScriptRoot}
+$sources=@((Join-Path $adapterRoot 'RosConformanceAdapter.cs'))
 foreach ($source in $sources) { Copy-Item -LiteralPath $source -Destination $target }
 [IO.File]::WriteAllText((Join-Path $target 'StimulationControllerConformanceTests.cs'),$adapted)
 New-Item -ItemType Directory -Path (Join-Path $target 'lib') | Out-Null
