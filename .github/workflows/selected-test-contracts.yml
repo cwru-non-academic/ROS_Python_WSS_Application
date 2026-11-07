@@ -1,0 +1,30 @@
+name: Selected test source contracts
+on:
+  pull_request:
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  contracts:
+    name: Selected test source contracts (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify source and credential boundaries
+        shell: pwsh
+        run: |
+          ./.github/scripts/tests/Test-RosSelectedContext.ps1
+          ./.github/scripts/tests/Test-RosOrdinaryTooling.ps1
+          python -B .github/scripts/tests/test_selected_ros_runner.py
+          if ($LASTEXITCODE -ne 0) { throw 'ROS runner contracts failed.' }

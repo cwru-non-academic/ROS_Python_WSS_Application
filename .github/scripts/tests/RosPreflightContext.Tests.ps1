@@ -46,6 +46,7 @@ function New-Fixture {
     Copy-Item -LiteralPath (Join-Path $repositoryRoot '.github/scripts/wss-ci') -Destination (Join-Path $sourceRoot '.github/scripts/wss-ci') -Recurse
     Copy-Item -LiteralPath $workflowPath -Destination (Join-Path $sourceRoot '.github/workflows/wss-preflight.yml')
     Copy-Item -LiteralPath (Join-Path $repositoryRoot '.github/python-ci.json') -Destination (Join-Path $sourceRoot '.github/python-ci.json')
+    Copy-Item -LiteralPath (Join-Path $repositoryRoot '.github/python-layered-ci.json') -Destination (Join-Path $sourceRoot '.github/python-layered-ci.json')
     $lock = Get-Content -LiteralPath (Join-Path $repositoryRoot '.github/scripts/wss-ci.lock.json') -Raw | ConvertFrom-Json -AsHashtable
     $lock.source_commit = $coreSha
     $lock.source_ref = "refs/heads/ci/tooling/$coreSha"
@@ -198,6 +199,8 @@ try {
         $fixture=New-Fixture
         $configPath=Join-Path $fixture.source '.github/python-ci.json'
         $config=Get-Content $configPath -Raw|ConvertFrom-Json -AsHashtable; $config.channels=@('dev'); Write-Json $configPath $config
+        $layeredPath=Join-Path $fixture.source '.github/python-layered-ci.json'
+        $layered=Get-Content $layeredPath -Raw|ConvertFrom-Json -AsHashtable; $layered.channels=@('dev'); Write-Json $layeredPath $layered
         $fixture.sourceSha=Commit-Fixture $fixture.source
         Expect-Rejection $workflow $jobName $fixture 'main' '' 'capability'
         $fixture=New-Fixture
