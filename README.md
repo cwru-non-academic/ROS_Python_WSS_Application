@@ -190,8 +190,11 @@ these template changes do not rewrite existing user configuration. Core keeps
 its existing normalization behavior for invalid address values.
 Keep the firmware and calibration values appropriate to your hardware.
 
-After changing receiver addresses, stop and restart the application so Core
-constructs a new address map. The CLI `reload-core` command does not rebuild that map.
+After changing receiver addresses, stop and restart the ROS driver so Core
+constructs a new address map. The driver reads `config_path` during startup and
+does not expose a reload command or ROS reload service. The pinned Python
+wrapper provides `LoadCoreConfigFile()` and `LoadParamsJson()` for callers using
+its API directly; the ROS driver does not call these methods.
 Setup continues asynchronously after controller initialization. An initialized
 application or an advancing tick loop does not establish that a device is ready.
 Core setup and tick errors are recorded in the configured log file; check the
