@@ -5,6 +5,7 @@ param(
     [Parameter(Mandatory)][string]$WrapperSha,
     [Parameter(Mandatory)][string]$FixtureRoot,
     [Parameter(Mandatory)][string]$ToolsRoot,
+    [string]$ToolsSha='',
     [Parameter(Mandatory)][string]$OutputRoot,
     [string]$PythonExe='python',
     [ValidateSet('committed','candidate')][string]$Mode='committed',
@@ -14,10 +15,18 @@ param(
 $ErrorActionPreference = 'Stop'
 . (Join-Path $ToolsRoot '.github/scripts/PythonContract.ps1')
 Assert-PythonSource $RosRoot $RosSha -IgnoreSubmodule
+if ($Mode -ceq 'committed') {
+    . "$PSScriptRoot/RosOrdinaryTooling.ps1"
+    Assert-RosOrdinaryProductPair $RosRoot $RosSha $WrapperSha
+}
 if (Test-Path -LiteralPath $OutputRoot) { throw 'ROS platform output must be new.' }
 New-Item -ItemType Directory -Path $OutputRoot | Out-Null
 # Exercise the same installed-wheel, Ports and C# backend checks as Python CLI.
 $candidateOptions = @{Mode=$Mode}
+if ($Mode -ceq 'committed') {
+    if (!$ToolsSha) { throw 'Ordinary ROS platform requires an explicit immutable tooling SHA.' }
+    $candidateOptions.ToolsRoot=$ToolsRoot; $candidateOptions.ToolsSha=$ToolsSha; $candidateOptions.ConfigPath=Join-Path $ToolsRoot '.github/python-ci.json'
+}
 if ($Mode -ceq 'candidate') { $candidateOptions.ArtifactRoot=$ArtifactRoot; $candidateOptions.CandidatePath=$CandidatePath }
 & (Join-Path $ToolsRoot '.github/scripts/Invoke-PlatformCompatibility.ps1') @candidateOptions -WrapperRoot $WrapperRoot -WrapperSha $WrapperSha -FixtureRoot $FixtureRoot -OutputRoot (Join-Path $OutputRoot 'wrapper-platform') -PythonExe $PythonExe
 if (!$?) { throw 'Shared Python platform compatibility failed.' }
@@ -46,6 +55,10 @@ if ($model.tests -ne 5 -or $model.failed -ne 0 -or $model.skipped -ne 0 -or $mod
     throw 'All five existing model tests and fifteen device/scenario observations must execute without skips.'
 }
 Assert-PythonSource $RosRoot $RosSha -IgnoreSubmodule
+if ($Mode -ceq 'committed') {
+    . "$PSScriptRoot/RosOrdinaryTooling.ps1"
+    Assert-RosOrdinaryProductPair $RosRoot $RosSha $WrapperSha
+}
 Assert-PythonSource $WrapperRoot $WrapperSha
 $platform = Get-Content (Join-Path $OutputRoot 'wrapper-platform/platform.json') -Raw | ConvertFrom-Json
 @{

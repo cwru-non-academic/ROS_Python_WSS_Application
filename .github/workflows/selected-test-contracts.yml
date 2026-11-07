@@ -25,5 +25,6 @@ jobs:
         shell: pwsh
         run: |
           ./.github/scripts/tests/Test-RosSelectedContext.ps1
+          ./.github/scripts/tests/Test-RosOrdinaryTooling.ps1
           python -B .github/scripts/tests/test_selected_ros_runner.py
           if ($LASTEXITCODE -ne 0) { throw 'ROS runner contracts failed.' }
