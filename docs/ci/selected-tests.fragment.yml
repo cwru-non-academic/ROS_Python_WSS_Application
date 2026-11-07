@@ -1,0 +1,43 @@
+# INACTIVE integration fragment. Full locked Core checkout and trusted source only.
+# Existing candidate resolution, guards, all platform/native jobs remain mandatory.
+steps:
+  - name: Prepare or recover the durable selection
+    id: prepare
+    shell: pwsh
+    env:
+      GH_TOKEN: ${{ steps.read.outputs.token }}
+      WSS_TEST_VARIABLE_READ_TOKEN: ${{ steps.variables.outputs.token }}
+      WSS_CI_CHANNEL: ${{ env.WSS_CI_CHANNEL }}
+    run: |
+      node workflow-guard/tools/ci/ci-test-selection.mjs select python-ros "$env:PRODUCT_CANDIDATE_PATH" "$env:RUNNER_TEMP/test-context-prepare" "$env:PRODUCT_MODE"
+      if ($LASTEXITCODE -ne 0) { throw 'Selection preparation failed.' }
+  - uses: actions/upload-artifact@v4
+    if: steps.prepare.outputs.created == 'true'
+    with:
+      name: ${{ steps.prepare.outputs.artifact_name }}
+      path: ${{ runner.temp }}/test-context-prepare/context.json
+      if-no-files-found: error
+      retention-days: 90
+      overwrite: false
+  - name: Authenticate stored selection before exposing any selected SHA
+    id: selection
+    shell: pwsh
+    env:
+      GH_TOKEN: ${{ steps.read.outputs.token }}
+      WSS_CI_CHANNEL: ${{ env.WSS_CI_CHANNEL }}
+    run: |
+      node workflow-guard/tools/ci/ci-test-selection.mjs load python-ros "$env:PRODUCT_CANDIDATE_PATH" "$env:RUNNER_TEMP/test-context" "$env:PRODUCT_MODE"
+      if ($LASTEXITCODE -ne 0) { throw 'Durable selection authentication failed.' }
+  - uses: actions/checkout@v4
+    with:
+      repository: ${{ steps.selection.outputs.test_repository }}
+      ref: ${{ steps.selection.outputs.test_commit }}
+      path: selected-tests
+      submodules: false
+      persist-credentials: false
+  # Construct roots.json with all actual product and initialized gitlink identities.
+  # Invoke the trusted source's Invoke-SelectedRosTestsWithContext.ps1 using
+  # WSS_TEST_SELECTION_ID=${{ steps.selection.outputs.selection_id }} and unchanged
+  # actual product resolver arguments. Do not execute scripts from selected-tests.
+  # The bridge emits selection/evidence.json only after unchanged mandatory baseline
+  # plus selected canonical suite plus all 23 own tests pass and Core rechecks roots.

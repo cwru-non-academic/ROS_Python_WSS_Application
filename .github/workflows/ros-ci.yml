@@ -73,7 +73,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 7df83b26db1b6a89293f9c37a74ec6491433ceb4
+          ref: 9c375d7d39b7fe212483112effcdcdd5b61cf381
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4
@@ -133,13 +133,26 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 7df83b26db1b6a89293f9c37a74ec6491433ceb4
+          ref: 9c375d7d39b7fe212483112effcdcdd5b61cf381
           path: tools
           persist-credentials: false
+      - name: Bind ordinary tooling and resolve immutable capability fixture
+        id: ordinary
+        shell: pwsh
+        run: |
+          . ./source/.github/scripts/RosOrdinaryTooling.ps1
+          $toolsSha=Get-RosOrdinaryToolsSha "$env:GITHUB_WORKSPACE/source" $env:GITHUB_SHA
+          Assert-RosOrdinaryToolsCheckout "$env:GITHUB_WORKSPACE/tools" $toolsSha
+          . ./tools/.github/scripts/PythonContract.ps1
+          . ./tools/.github/scripts/PythonProfiles/Tooling.ps1
+          $wrapperSha=(git -C wrapper rev-parse HEAD).Trim()
+          $binding=Resolve-PythonOrdinaryTooling -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -ToolsSha $toolsSha -ConfigPath "$env:GITHUB_WORKSPACE/tools/.github/python-ci.json" -WrapperRoot "$env:GITHUB_WORKSPACE/wrapper" -WrapperSha $wrapperSha
+          "fixture=$($binding.fixture_commit)" >> $env:GITHUB_OUTPUT
+          "tools_sha=$toolsSha" >> $env:GITHUB_OUTPUT
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/CSharp_WSS_Integration_Lib
-          ref: 02172a64c55becd5535204f46f10b4755bf3ee05
+          ref: ${{ steps.ordinary.outputs.fixture }}
           path: fixture
           persist-credentials: false
       - uses: actions/setup-python@v5
@@ -155,7 +168,7 @@ jobs:
         env:
           WRAPPER_SHA: ${{ needs.payload-stage.outputs.wrapper }}
         run: |
-          ./source/.github/scripts/Invoke-RosPlatformCompatibility.ps1 -RosRoot "$env:GITHUB_WORKSPACE/source" -RosSha $env:GITHUB_SHA -WrapperRoot "$env:GITHUB_WORKSPACE/wrapper" -WrapperSha $env:WRAPPER_SHA -FixtureRoot "$env:GITHUB_WORKSPACE/fixture" -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -OutputRoot "$env:RUNNER_TEMP/ros-platform"
+          ./source/.github/scripts/Invoke-RosPlatformCompatibility.ps1 -RosRoot "$env:GITHUB_WORKSPACE/source" -RosSha $env:GITHUB_SHA -WrapperRoot "$env:GITHUB_WORKSPACE/wrapper" -WrapperSha $env:WRAPPER_SHA -FixtureRoot "$env:GITHUB_WORKSPACE/fixture" -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -ToolsSha "${{ steps.ordinary.outputs.tools_sha }}" -OutputRoot "$env:RUNNER_TEMP/ros-platform"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -209,13 +222,26 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 7df83b26db1b6a89293f9c37a74ec6491433ceb4
+          ref: 9c375d7d39b7fe212483112effcdcdd5b61cf381
           path: tools
           persist-credentials: false
+      - name: Bind ordinary tooling and resolve immutable capability fixture
+        id: ordinary
+        shell: pwsh
+        run: |
+          . ./source/.github/scripts/RosOrdinaryTooling.ps1
+          $toolsSha=Get-RosOrdinaryToolsSha "$env:GITHUB_WORKSPACE/source" $env:GITHUB_SHA
+          Assert-RosOrdinaryToolsCheckout "$env:GITHUB_WORKSPACE/tools" $toolsSha
+          . ./tools/.github/scripts/PythonContract.ps1
+          . ./tools/.github/scripts/PythonProfiles/Tooling.ps1
+          $wrapperSha=(git -C wrapper rev-parse HEAD).Trim()
+          $binding=Resolve-PythonOrdinaryTooling -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -ToolsSha $toolsSha -ConfigPath "$env:GITHUB_WORKSPACE/tools/.github/python-ci.json" -WrapperRoot "$env:GITHUB_WORKSPACE/wrapper" -WrapperSha $wrapperSha
+          "fixture=$($binding.fixture_commit)" >> $env:GITHUB_OUTPUT
+          "tools_sha=$toolsSha" >> $env:GITHUB_OUTPUT
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/CSharp_WSS_Integration_Lib
-          ref: 02172a64c55becd5535204f46f10b4755bf3ee05
+          ref: ${{ steps.ordinary.outputs.fixture }}
           path: fixture
           persist-credentials: false
       - uses: actions/setup-python@v5
@@ -231,7 +257,7 @@ jobs:
         env:
           WRAPPER_SHA: ${{ needs.payload-stage.outputs.wrapper }}
         run: |
-          ./source/.github/scripts/Invoke-RosPlatformCompatibility.ps1 -RosRoot "$env:GITHUB_WORKSPACE/source" -RosSha $env:GITHUB_SHA -WrapperRoot "$env:GITHUB_WORKSPACE/wrapper" -WrapperSha $env:WRAPPER_SHA -FixtureRoot "$env:GITHUB_WORKSPACE/fixture" -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -OutputRoot "$env:RUNNER_TEMP/ros-platform"
+          ./source/.github/scripts/Invoke-RosPlatformCompatibility.ps1 -RosRoot "$env:GITHUB_WORKSPACE/source" -RosSha $env:GITHUB_SHA -WrapperRoot "$env:GITHUB_WORKSPACE/wrapper" -WrapperSha $env:WRAPPER_SHA -FixtureRoot "$env:GITHUB_WORKSPACE/fixture" -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -ToolsSha "${{ steps.ordinary.outputs.tools_sha }}" -OutputRoot "$env:RUNNER_TEMP/ros-platform"
       - name: Record native macOS architecture worker outcome
         if: always()
         shell: pwsh
@@ -276,7 +302,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 7df83b26db1b6a89293f9c37a74ec6491433ceb4
+          ref: 9c375d7d39b7fe212483112effcdcdd5b61cf381
           path: tools
           persist-credentials: false
       - uses: actions/download-artifact@v4
@@ -415,7 +441,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 7df83b26db1b6a89293f9c37a74ec6491433ceb4
+          ref: 9c375d7d39b7fe212483112effcdcdd5b61cf381
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4
@@ -424,10 +450,23 @@ jobs:
           ref: ${{ steps.sources.outputs.wrapper }}
           path: wrapper
           persist-credentials: false
+      - name: Bind ordinary tooling and resolve immutable capability fixture
+        id: ordinary
+        shell: pwsh
+        run: |
+          . ./source/.github/scripts/RosOrdinaryTooling.ps1
+          $toolsSha=Get-RosOrdinaryToolsSha "$env:GITHUB_WORKSPACE/source" $env:GITHUB_SHA
+          Assert-RosOrdinaryToolsCheckout "$env:GITHUB_WORKSPACE/tools" $toolsSha
+          . ./tools/.github/scripts/PythonContract.ps1
+          . ./tools/.github/scripts/PythonProfiles/Tooling.ps1
+          $wrapperSha=(git -C wrapper rev-parse HEAD).Trim()
+          $binding=Resolve-PythonOrdinaryTooling -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -ToolsSha $toolsSha -ConfigPath "$env:GITHUB_WORKSPACE/tools/.github/python-ci.json" -WrapperRoot "$env:GITHUB_WORKSPACE/wrapper" -WrapperSha $wrapperSha
+          "fixture=$($binding.fixture_commit)" >> $env:GITHUB_OUTPUT
+          "tools_sha=$toolsSha" >> $env:GITHUB_OUTPUT
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/CSharp_WSS_Integration_Lib
-          ref: 02172a64c55becd5535204f46f10b4755bf3ee05
+          ref: ${{ steps.ordinary.outputs.fixture }}
           path: fixture
           persist-credentials: false
       - uses: actions/setup-python@v5
@@ -458,6 +497,10 @@ jobs:
           $c = $env:CANDIDATE_JSON | ConvertFrom-Json
           Assert-PythonProducer $c
           ./tools/.github/scripts/Resolve-WssRelease.ps1 -RunId $c.run_id -ExpectedArtifactId $c.artifact_id -ExpectedCommit $c.commit -ArchiveName $c.archive -ExpectedSha256 $c.sha256 -OutputRoot "$env:RUNNER_TEMP/resolved"
+      - name: Reject wrong tooling, config and product bindings
+        shell: pwsh
+        run: |
+          ./source/.github/scripts/tests/Test-RosOrdinaryTooling.ps1 -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -ToolsSha "${{ steps.ordinary.outputs.tools_sha }}" -WrapperRoot "$env:GITHUB_WORKSPACE/wrapper" -WrapperSha "${{ steps.sources.outputs.wrapper }}" -RosRoot "$env:GITHUB_WORKSPACE/source" -RosSha $env:GITHUB_SHA
       - name: Execute unchanged canonical corpus through the ROS production factory
         shell: pwsh
         env:
@@ -465,12 +508,12 @@ jobs:
         run: |
           $options = @{
             WrapperRoot = "$env:GITHUB_WORKSPACE/wrapper"
-            FixtureRoot = "$env:GITHUB_WORKSPACE/fixture"
             WrapperSha = $env:WRAPPER_SHA
             RosRoot = "$env:GITHUB_WORKSPACE/source"
             RosSha = $env:GITHUB_SHA
             ToolsRoot = "$env:GITHUB_WORKSPACE/tools"
-            ConfigPath = "$env:GITHUB_WORKSPACE/source/.github/python-ci.json"
+            ToolsSha = "${{ steps.ordinary.outputs.tools_sha }}"
+            ConfigPath = "$env:GITHUB_WORKSPACE/tools/.github/python-ci.json"
             OutputRoot = "$env:RUNNER_TEMP/canonical"
             Mode = $env:ROS_MODE
           }
@@ -478,7 +521,7 @@ jobs:
             $options.ArtifactRoot = "$env:RUNNER_TEMP/resolved/extracted/WSS-Universal"
             $options.CandidatePath = "$env:RUNNER_TEMP/resolved/candidate.json"
           }
-          ./source/.github/scripts/Invoke-RosConformance.ps1 @options
+          ./source/.github/scripts/Invoke-ProfiledRosConformance.ps1 @options
       - uses: actions/upload-artifact@v4
         with:
           name: ros-canonical-evidence
@@ -488,6 +531,10 @@ jobs:
             ${{ runner.temp }}/canonical/results.xml
             ${{ runner.temp }}/canonical/dotnet.log
             ${{ runner.temp }}/canonical/projection.json
+            ${{ runner.temp }}/canonical/multi/evidence.json
+            ${{ runner.temp }}/canonical/multi/results.xml
+            ${{ runner.temp }}/canonical/multi/dotnet.log
+            ${{ runner.temp }}/canonical/multi/projection.json
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -503,6 +550,12 @@ jobs:
           foreach ($name in @('evidence.json','results.xml','dotnet.log','projection.json')) {
             Copy-Item -LiteralPath "$env:RUNNER_TEMP/canonical/$name" -Destination "$env:RUNNER_TEMP/ros-evidence/$name"
           }
+          if (Test-Path "$env:RUNNER_TEMP/canonical/multi/evidence.json") {
+            New-Item -ItemType Directory -Path "$env:RUNNER_TEMP/ros-evidence/multi" | Out-Null
+            foreach ($name in @('evidence.json','results.xml','dotnet.log','projection.json')) {
+              Copy-Item -LiteralPath "$env:RUNNER_TEMP/canonical/multi/$name" -Destination "$env:RUNNER_TEMP/ros-evidence/multi/$name"
+            }
+          }
       - uses: actions/download-artifact@v4
         with:
           name: ros-native-evidence
@@ -511,12 +564,12 @@ jobs:
         with:
           name: ros-model-evidence
           path: ${{ runner.temp }}/ros-evidence
-      - name: Verify all seven files with the versioned shared ROS validators
+      - name: Verify complete capability profile and independent native ROS evidence
         shell: pwsh
-        run: ./source/.github/scripts/Complete-RosEvidence.ps1 -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -Root "$env:RUNNER_TEMP/ros-evidence"
+        run: ./source/.github/scripts/Complete-ProfiledRosEvidence.ps1 -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -ToolsSha "${{ steps.ordinary.outputs.tools_sha }}" -WrapperRoot "$env:GITHUB_WORKSPACE/wrapper" -WrapperSha "${{ steps.sources.outputs.wrapper }}" -Root "$env:RUNNER_TEMP/ros-evidence"
       - name: Run negative evidence safety checks
         shell: pwsh
-        run: ./source/.github/scripts/Test-RosEvidence.ps1 -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -Root "$env:RUNNER_TEMP/ros-evidence"
+        run: ./source/.github/scripts/Test-RosEvidence.ps1 -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -ToolsSha "${{ steps.ordinary.outputs.tools_sha }}" -WrapperRoot "$env:GITHUB_WORKSPACE/wrapper" -WrapperSha "${{ steps.sources.outputs.wrapper }}" -Root "$env:RUNNER_TEMP/ros-evidence"
       - uses: actions/upload-artifact@v4
         with:
           name: ros-compatibility-evidence
