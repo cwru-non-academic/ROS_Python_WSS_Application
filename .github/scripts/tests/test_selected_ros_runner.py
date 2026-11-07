@@ -2,6 +2,8 @@ import importlib.util
 import json
 from pathlib import Path
 import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 ROOT=Path(__file__).resolve().parents[3]
@@ -24,4 +26,20 @@ class RunnerTests(unittest.TestCase):
  def test_missing_adapter(self):
   (self.root/'conformance/RosConformanceAdapter.cs').unlink()
   with self.assertRaises(ValueError):runner.contract(self.root)
+ def execute_inventory(self, mode):
+  app=self.root/'app';(app/'tests').mkdir(parents=True)
+  expected=[]
+  for index, relative in enumerate(runner.FILES):
+   decorator='@unittest.skip("forbidden skip")\n ' if mode=='skip' and index==0 else ''
+   assertion='self.fail("fixture failure")' if mode=='failure' and index==0 else 'self.assertTrue(True)'
+   (app/relative).write_text('import unittest\nclass Cases(unittest.TestCase):\n '+decorator+'def test_case(self): '+assertion+'\n')
+   expected.append(Path(relative).stem+'.Cases.test_case')
+  if mode=='missing':expected.pop()
+  command='import importlib.util,json;from pathlib import Path;s=importlib.util.spec_from_file_location("runner",'+repr(str(ROOT/'.github/scripts/selected_ros_tests.py'))+');m=importlib.util.module_from_spec(s);s.loader.exec_module(m);m.run(Path('+repr(str(app))+'),'+repr(expected)+',Path('+repr(str(self.root/'result.json'))+'))'
+  result=subprocess.run([sys.executable,'-I','-B','-c',command],capture_output=True,text=True)
+  self.assertNotEqual(result.returncode,0,result.stdout+result.stderr)
+  self.assertFalse((self.root/'result.json').exists())
+ def test_reject_runtime_skip(self):self.execute_inventory('skip')
+ def test_reject_missing_runtime_inventory(self):self.execute_inventory('missing')
+ def test_reject_runtime_failure(self):self.execute_inventory('failure')
 if __name__=='__main__':unittest.main()

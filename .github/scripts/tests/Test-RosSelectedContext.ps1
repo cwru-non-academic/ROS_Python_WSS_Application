@@ -8,6 +8,7 @@ $roots=@{selection_id=('a'*64);test_root=(Join-Path $temp 'tests');products=@(
     @{repository='cwru-non-academic/CSharp_WSS_Integration_Lib';commit=('d'*40);path=(Join-Path $temp 'fixture')}
 )}
 $roots | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $temp 'roots.json')
+'{"scope":"run"}' | Set-Content (Join-Path $temp 'context.json')
 $script:events=[Collections.Generic.List[string]]::new()
 $script:failure=''
 function Invoke-ReviewedSelectionCore($CoreRoot,$Operation,$TargetId,$ContextPath,$RootsPath,$EvidencePath='') {
@@ -25,6 +26,16 @@ function Invoke-RosIsolatedChild($Script,$Options) {
 $options=@{CoreRoot=(Join-Path $temp 'core');ContextPath=(Join-Path $temp 'context.json');RootsPath=(Join-Path $temp 'roots.json');WorkRoot=(Join-Path $temp 'output');ToolsRoot=$roots.products[1].path}
 Invoke-RosSelectedWithContext @options
 if(($events -join ',') -cne 'inspect,child,evidence'){throw 'Core verification ordering changed.'}
+$script:observedCampaign=$null
+$recordingChild=${function:Invoke-RosIsolatedChild}
+function Invoke-RosIsolatedChild($Script,$Options){$script:observedCampaign=$Options.SelectionEnabledCampaign}
+'{"scope":"campaign"}' | Set-Content (Join-Path $temp 'context.json')
+Invoke-RosSelectedWithContext @options
+if($observedCampaign -cne $true){throw 'Authenticated campaign lost modern-only requirement.'}
+'{"scope":"run"}' | Set-Content (Join-Path $temp 'context.json')
+Invoke-RosSelectedWithContext @options
+if($observedCampaign -cne $false){throw 'Ordinary run incorrectly forced modern.'}
+${function:Invoke-RosIsolatedChild}=$recordingChild
 foreach($failure in @('inspect','child')){
     $events.Clear();$script:failure=$failure;$rejected=$false
     try{Invoke-RosSelectedWithContext @options}catch{$rejected=$true}

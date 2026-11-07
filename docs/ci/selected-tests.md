@@ -2,7 +2,7 @@
 
 This fragment is documentation, not an active workflow. Do not enable it until the
 reviewed full WSSCore tooling checkout includes durable run-context recovery and
-the ROS canonical profile agrees with the authenticated payload capability profile.
+the declared ROS canonical fixture agrees with the authenticated payload profile.
 The current wss-ci.lock.json deliberately remains unchanged.
 
 ## Immutable boundaries
@@ -26,9 +26,11 @@ selection acceptance evidence.
 The child runs mandatory canonical ROS conformance, then repeats it with the
 selected adapter/stub, then executes the entire 23-case selected Python inventory.
 Legacy fixture contracts run 10 canonical cases; modern contracts run 16 single-
-and 16 multi-device cases. These fixture contracts are currently strict and fail
-closed on incompatible payloads. Capability-based profile integration remains an
-activation prerequisite; test selection must never force or downgrade a profile.
+and 16 multi-device cases. The trusted metadata-only capability checker first verifies the complete projection,
+recognizes only the reviewed legacy producer or complete modern capabilities, and
+requires the actual canonical fixture contract to match. Selection-enabled campaign
+contexts require modern 16+16 coverage. Unknown legacy producers, partial modern
+APIs and fixture/profile mismatches fail closed; no suite downgrade is allowed.
 
 The trusted preparers preserve exact canonical fixture digest and assertion checks.
 They do not execute selected Prepare*.ps1 files. The Python runner archives exact
