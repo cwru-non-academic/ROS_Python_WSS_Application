@@ -569,7 +569,7 @@ jobs:
         run: ./source/.github/scripts/Complete-ProfiledRosEvidence.ps1 -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -ToolsSha "${{ steps.ordinary.outputs.tools_sha }}" -WrapperRoot "$env:GITHUB_WORKSPACE/wrapper" -WrapperSha "${{ steps.sources.outputs.wrapper }}" -Root "$env:RUNNER_TEMP/ros-evidence"
       - name: Run negative evidence safety checks
         shell: pwsh
-        run: ./source/.github/scripts/Test-RosEvidence.ps1 -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -Root "$env:RUNNER_TEMP/ros-evidence"
+        run: ./source/.github/scripts/Test-RosEvidence.ps1 -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -ToolsSha "${{ steps.ordinary.outputs.tools_sha }}" -WrapperRoot "$env:GITHUB_WORKSPACE/wrapper" -WrapperSha "${{ steps.sources.outputs.wrapper }}" -Root "$env:RUNNER_TEMP/ros-evidence"
       - uses: actions/upload-artifact@v4
         with:
           name: ros-compatibility-evidence
