@@ -16,6 +16,8 @@ param(
     [ValidateRange(30,1800)][int]$TimeoutSeconds=300
 )
 . (Join-Path $ToolsRoot ".github/scripts/PythonContract.ps1")
+$previousStage = $env:WSS_CONFORMANCE_STAGE
+try {
 # Ordinary and candidate callers must execute both isolated stages by default.
 # Explicit single/multi remain available for focused diagnosis only.
 if ($Stage -ceq 'all') {
@@ -121,3 +123,5 @@ if ($Mode -ceq 'committed') {
     $projection | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $OutputRoot 'projection.json')
 }
 Write-Output 'PASS: Python via pythonnet through shared production commands; sixteen canonical cases per stage, twenty unchanged assertion expressions; Production Python executed; emulator only, no terminal input or physical hardware.'
+
+} finally { $env:WSS_CONFORMANCE_STAGE = $previousStage }
