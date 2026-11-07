@@ -28,3 +28,6 @@ jobs:
           ./.github/scripts/tests/Test-RosOrdinaryTooling.ps1
           python -B .github/scripts/tests/test_selected_ros_runner.py
           if ($LASTEXITCODE -ne 0) { throw 'ROS runner contracts failed.' }
+      - name: Reject actual child mutations of parent authority and baseline
+        shell: pwsh
+        run: ./.github/scripts/tests/Test-SelectedParentSnapshot.ps1
