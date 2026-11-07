@@ -1,4 +1,5 @@
 . "$PSScriptRoot/SelectedTestContext.ps1"
+. "$PSScriptRoot/SelectedParentSnapshot.ps1"
 
 function Invoke-RosIsolatedChild([string]$Script,[hashtable]$Options) {
     # A child interpreter prevents selected code seeing parent's saved-token variables.
@@ -41,6 +42,7 @@ function Invoke-RosSelectedWithContext {
     )
     $ErrorActionPreference='Stop'
     $binding=Invoke-ReviewedSelectionCore $CoreRoot inspect 'python-ros' $ContextPath $RootsPath
+    $authority=New-SelectedParentSnapshot @($CoreRoot,$PSScriptRoot) @($ContextPath,$RootsPath,(Join-Path $PSScriptRoot 'wss-ci.lock.json'))
     $context=Get-Content -LiteralPath $ContextPath -Raw | ConvertFrom-Json
     $roots=Get-Content -LiteralPath $RootsPath -Raw | ConvertFrom-Json
     $ros=Get-SelectedProduct $roots 'cwru-non-academic/ROS_Python_WSS_Application'
@@ -72,8 +74,12 @@ function Invoke-RosSelectedWithContext {
     $profileHash=(Get-FileHash -LiteralPath $profilePath -Algorithm SHA256).Hash
     $baselineRoot=Join-Path $work 'baseline'
     $baselineSnapshot=Get-RosBaselineSnapshot $baselineRoot $profile.profile
+    Assert-SelectedParentSnapshot $authority
+    $baselineInventory=New-SelectedParentSnapshot @($baselineRoot) @($profilePath)
     $options.Phase='selected'
     Invoke-RosIsolatedChild (Join-Path $PSScriptRoot 'Invoke-SelectedRosTests.ps1') $options
     if((Get-FileHash -LiteralPath $profilePath -Algorithm SHA256).Hash -cne $profileHash -or (Get-RosBaselineSnapshot $baselineRoot $profile.profile) -cne $baselineSnapshot){throw 'Selected suite changed mandatory ROS baseline output; no selection evidence emitted.'}
+    Assert-SelectedParentSnapshot $baselineInventory
+    Assert-SelectedParentSnapshot $authority
     Invoke-ReviewedSelectionCore $CoreRoot evidence 'python-ros' $ContextPath $RootsPath (Join-Path $work 'selection/evidence.json')
 }

@@ -2,6 +2,9 @@ $ErrorActionPreference='Stop'
 . "$PSScriptRoot/../RosSelectedContext.ps1"
 $temp=Join-Path ([IO.Path]::GetTempPath()) ('ros-context-'+[guid]::NewGuid().ToString('N'))
 $null=New-Item -ItemType Directory $temp
+$temp=(& python -c 'import pathlib,sys; print(pathlib.Path(sys.argv[1]).resolve())' $temp).Trim()
+$null=New-Item -ItemType Directory -Path (Join-Path $temp 'core') -Force
+'core fixture' | Set-Content (Join-Path $temp 'core/code.mjs')
 $roots=@{selection_id=('a'*64);test_root=(Join-Path $temp 'tests');products=@(
     @{repository='cwru-non-academic/ROS_Python_WSS_Application';commit=('b'*40);path=(Join-Path $temp 'ros')},
     @{repository='cwru-non-academic/Python_WSS_Integration_Lib';commit=('c'*40);path=(Join-Path $temp 'wrapper')},
@@ -27,6 +30,10 @@ function Invoke-RosIsolatedChild($Script,$Options) {
         $null=New-Item -ItemType Directory -Path $baseline -Force
         '{"profile":"legacy-v1"}' | Set-Content (Join-Path $Options.OutputRoot 'profile.json')
         foreach($file in @('evidence.json','results.xml','dotnet.log','projection.json')){'baseline proof' | Set-Content (Join-Path $baseline $file)}
+    } elseif($script:failure -ceq 'mutate-core') {
+        $probe=Join-Path $temp 'mutate-core.ps1'
+        'param([string]$EvidencePath); "tampered" | Set-Content -LiteralPath $EvidencePath' | Set-Content $probe
+        & $realChild $probe @{EvidencePath=(Join-Path $temp 'core/code.mjs')}
     } elseif($script:failure -ceq 'mutate-baseline') {
         $probe=Join-Path $temp 'mutate-baseline.ps1'
         'param([string]$EvidencePath); "tampered" | Set-Content -LiteralPath $EvidencePath' | Set-Content $probe
@@ -50,7 +57,7 @@ if($observedCampaign -cne $true){throw 'Authenticated campaign lost modern-only 
 Invoke-RosContextTest @options
 if($observedCampaign -cne $false){throw 'Ordinary run incorrectly forced modern.'}
 ${function:Invoke-RosIsolatedChild}=$recordingChild
-foreach($failure in @('inspect','child','mutate-baseline')){
+foreach($failure in @('inspect','child','mutate-baseline','mutate-core')){
     $events.Clear();$script:failure=$failure;$rejected=$false
     try{Invoke-RosContextTest @options}catch{$rejected=$true}
     if(!$rejected -or $events.Contains('evidence')){throw 'Failure emitted evidence.'}
