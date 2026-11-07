@@ -73,7 +73,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 8ce0697f9dff86b080687b3b4cb8c447a434082b
+          ref: 7df83b26db1b6a89293f9c37a74ec6491433ceb4
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4
@@ -133,13 +133,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 8ce0697f9dff86b080687b3b4cb8c447a434082b
+          ref: 7df83b26db1b6a89293f9c37a74ec6491433ceb4
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/CSharp_WSS_Integration_Lib
-          ref: fc427c5b8bc6534a7d02f00283830072572aa03a
+          ref: 02172a64c55becd5535204f46f10b4755bf3ee05
           path: fixture
           persist-credentials: false
       - uses: actions/setup-python@v5
@@ -209,13 +209,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 8ce0697f9dff86b080687b3b4cb8c447a434082b
+          ref: 7df83b26db1b6a89293f9c37a74ec6491433ceb4
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/CSharp_WSS_Integration_Lib
-          ref: fc427c5b8bc6534a7d02f00283830072572aa03a
+          ref: 02172a64c55becd5535204f46f10b4755bf3ee05
           path: fixture
           persist-credentials: false
       - uses: actions/setup-python@v5
@@ -276,7 +276,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 8ce0697f9dff86b080687b3b4cb8c447a434082b
+          ref: 7df83b26db1b6a89293f9c37a74ec6491433ceb4
           path: tools
           persist-credentials: false
       - uses: actions/download-artifact@v4
@@ -415,7 +415,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 8ce0697f9dff86b080687b3b4cb8c447a434082b
+          ref: 7df83b26db1b6a89293f9c37a74ec6491433ceb4
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4
@@ -427,7 +427,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/CSharp_WSS_Integration_Lib
-          ref: fc427c5b8bc6534a7d02f00283830072572aa03a
+          ref: 02172a64c55becd5535204f46f10b4755bf3ee05
           path: fixture
           persist-credentials: false
       - uses: actions/setup-python@v5
@@ -488,10 +488,6 @@ jobs:
             ${{ runner.temp }}/canonical/results.xml
             ${{ runner.temp }}/canonical/dotnet.log
             ${{ runner.temp }}/canonical/projection.json
-            ${{ runner.temp }}/canonical/multi/evidence.json
-            ${{ runner.temp }}/canonical/multi/results.xml
-            ${{ runner.temp }}/canonical/multi/dotnet.log
-            ${{ runner.temp }}/canonical/multi/projection.json
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -500,18 +496,12 @@ jobs:
           path: |
             ${{ runner.temp }}/canonical/*.log
             ${{ runner.temp }}/canonical/nunit/*.xml
-            ${{ runner.temp }}/canonical/multi/*.log
-            ${{ runner.temp }}/canonical/multi/nunit/*.xml
       - name: Stage canonical evidence for complete source-bound acceptance
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path "$env:RUNNER_TEMP/ros-evidence" | Out-Null
           foreach ($name in @('evidence.json','results.xml','dotnet.log','projection.json')) {
             Copy-Item -LiteralPath "$env:RUNNER_TEMP/canonical/$name" -Destination "$env:RUNNER_TEMP/ros-evidence/$name"
-          }
-          New-Item -ItemType Directory -Path "$env:RUNNER_TEMP/ros-evidence/multi" | Out-Null
-          foreach ($name in @('evidence.json','results.xml','dotnet.log','projection.json')) {
-            Copy-Item -LiteralPath "$env:RUNNER_TEMP/canonical/multi/$name" -Destination "$env:RUNNER_TEMP/ros-evidence/multi/$name"
           }
       - uses: actions/download-artifact@v4
         with:
@@ -521,7 +511,7 @@ jobs:
         with:
           name: ros-model-evidence
           path: ${{ runner.temp }}/ros-evidence
-      - name: Verify all eleven files with the versioned shared ROS validators
+      - name: Verify all seven files with the versioned shared ROS validators
         shell: pwsh
         run: ./source/.github/scripts/Complete-RosEvidence.ps1 -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -Root "$env:RUNNER_TEMP/ros-evidence"
       - name: Run negative evidence safety checks

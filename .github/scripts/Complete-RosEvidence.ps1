@@ -9,8 +9,7 @@ Assert-PythonResults (Join-Path $Root 'results.xml') $config -DotNet
 if ($e.sdk -cne $config.dotnet_sdk -or $e.python -cne $config.python_version -or $e.pythonnet -cne $config.pythonnet_version -or
     $e.fixture_sha -cne $config.fixture_commit -or $e.fixture_sha256 -cne $config.fixture_sha256 -or
     $e.target_framework -cne 'net9.0' -or $e.test_framework -cne 'NUnit 3.14.0' -or
-    $e.discovered -ne 16 -or $e.executed -ne 16 -or $e.passed -ne 16 -or $e.failed -ne 0 -or $e.skipped -ne 0 -or $e.assertion_expressions -ne 20) { throw 'Canonical runtime/fixture/execution mismatch.' }
-Assert-PythonMultiStageEvidence $Root $e $config
+    $e.discovered -ne 10 -or $e.executed -ne 10 -or $e.passed -ne 10 -or $e.failed -ne 0 -or $e.skipped -ne 0 -or $e.assertion_expressions -ne 18) { throw 'Canonical runtime/fixture/execution mismatch.' }
 $projection=Get-Content -LiteralPath (Join-Path $Root 'projection.json') -Raw | ConvertFrom-Json
 Assert-PythonSameCandidate $projection.candidate $e.candidate
 if ($projection.schema -cne 'wss-python-projection/v1' -or (Get-PythonProjectionDigest $projection.files) -cne $e.projection_sha256 -or
@@ -32,6 +31,6 @@ foreach ($name in @('ros-native-symlink.json','ros-native-copy.json')) {
     }
 }
 $actual=@(Get-ChildItem -LiteralPath $Root -Recurse -File | ForEach-Object { [IO.Path]::GetRelativePath($Root,$_.FullName).Replace('\','/') })
-if (@(Compare-Object @(Get-PythonEvidenceFiles ros) $actual -CaseSensitive).Count) { throw 'ROS evidence must contain exactly eleven files.' }
+if (@(Compare-Object @(Get-PythonEvidenceFiles ros) $actual -CaseSensitive).Count) { throw 'ROS evidence must contain exactly seven files.' }
 $e | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $Root 'evidence.json')
-Write-Output 'Verified canonical execution plus independent model and native ROS reports; eleven-file evidence assembled.'
+Write-Output 'Verified canonical execution plus independent model and native ROS reports; seven-file evidence assembled.'

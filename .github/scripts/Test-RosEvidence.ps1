@@ -31,7 +31,7 @@ foreach ($case in @('hash','model-skip','native-channel','model-scenario')) {
     }
     Require-Rejection $case { Assert-PythonRosReports $proof $copy }
 }
-if (@(Get-PythonEvidenceFiles ros).Count -ne 11 -or @(Get-PythonEvidenceJobs ros).Count -ne 3) { throw 'ROS role contract changed.' }
+if (@(Get-PythonEvidenceFiles ros).Count -ne 7 -or @(Get-PythonEvidenceJobs ros).Count -ne 3) { throw 'ROS role contract changed.' }
 Write-Output 'ROS negative evidence checks passed; these are rejection tests, not promotion approval.'
 
 foreach ($case in @('installed-count','installed-record-hash','installed-digest')) {
@@ -44,19 +44,4 @@ foreach ($case in @('installed-count','installed-record-hash','installed-digest'
     else { $report.installed_payload.projection_sha256=('0'*64) }
     $report | ConvertTo-Json -Depth 10 | Set-Content $path
     Require-Rejection $case { & (Join-Path $PSScriptRoot 'Complete-RosEvidence.ps1') -ToolsRoot $ToolsRoot -Root $copy }
-}
-
-$config=Read-PythonConfig (Join-Path $PSScriptRoot '../python-ci.json')
-foreach ($case in @('missing-multi','wrong-multi-source','wrong-multi-stage')) {
-    $copy=Join-Path (Split-Path -Parent $Root) ('ros-negative-'+[guid]::NewGuid().ToString('N'))
-    Copy-Item -LiteralPath $Root -Destination $copy -Recurse
-    $path=Join-Path $copy 'multi/evidence.json'
-    if ($case -ceq 'missing-multi') { Remove-Item -LiteralPath $path }
-    else {
-        $proof=Get-Content $path -Raw | ConvertFrom-Json
-        if ($case -ceq 'wrong-multi-source') { $proof.ros_sha=('0'*40) }
-        else { $proof.stage='single' }
-        $proof | ConvertTo-Json -Depth 10 | Set-Content $path
-    }
-    Require-Rejection $case { Assert-PythonMultiStageEvidence $copy $e $config }
 }

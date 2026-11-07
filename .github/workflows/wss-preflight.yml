@@ -61,7 +61,7 @@ jobs:
           $context = Get-WssCiChannelContext
           Assert-WssCiTargetRef $context.channel
           if ($env:WRAPPER_SHA -cnotmatch '^[0-9a-f]{40}$') { throw 'Candidate preflight requires an exact wrapper source.' }
-          $config = Get-Content -LiteralPath (Join-Path $root '.github/python-ci.json') -Raw | ConvertFrom-Json
+          $config = Get-Content -LiteralPath (Join-Path $root '.github/python-layered-ci.json') -Raw | ConvertFrom-Json
           if ($config.schema -cne 'wss-python-ci/v1' -or $config.baseline_ready -ne $true -or $config.automated_execution -cne 'pythonnet' -or $config.dotnet_sdk -cne '9.0.316' -or @($config.channels) -cnotcontains $context.channel) { throw 'Requested candidate channel capability has not been adopted.' }
           $raw = & node --input-type=module -e 'import {pathToFileURL} from "node:url"; const v=await import(pathToFileURL(process.argv[1])); const c=JSON.parse(process.argv[2]); v.candidate(c); console.log(JSON.stringify(c));' (Join-Path $root '.github/scripts/wss-ci/verify.mjs') $env:CANDIDATE_JSON
           if ($LASTEXITCODE -ne 0) { throw 'Canonical candidate identity is invalid.' }
@@ -154,7 +154,7 @@ jobs:
             RosRoot = "$env:GITHUB_WORKSPACE/source"
             RosSha = $env:GITHUB_SHA
             ToolsRoot = "$env:GITHUB_WORKSPACE/tools"
-            ConfigPath = "$env:GITHUB_WORKSPACE/source/.github/python-ci.json"
+            ConfigPath = "$env:GITHUB_WORKSPACE/source/.github/python-layered-ci.json"
             OutputRoot = "$env:RUNNER_TEMP/canonical"
             Mode = $env:ROS_MODE
           }
@@ -162,7 +162,7 @@ jobs:
             $options.ArtifactRoot = "$env:RUNNER_TEMP/resolved/extracted/WSS-Universal"
             $options.CandidatePath = "$env:RUNNER_TEMP/resolved/candidate.json"
           }
-          ./source/.github/scripts/Invoke-RosConformance.ps1 @options
+          ./source/.github/scripts/Invoke-LayeredRosConformance.ps1 @options
       - name: Stage verified complete payload for model and native ROS suites
         id: transfer
         shell: pwsh
@@ -554,10 +554,10 @@ jobs:
           path: ${{ runner.temp }}/ros-evidence
       - name: Verify all eleven files with the versioned shared ROS validators
         shell: pwsh
-        run: ./.github/scripts/Complete-RosEvidence.ps1 -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -Root "$env:RUNNER_TEMP/ros-evidence"
+        run: ./.github/scripts/Complete-LayeredRosEvidence.ps1 -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -Root "$env:RUNNER_TEMP/ros-evidence"
       - name: Run negative evidence safety checks
         shell: pwsh
-        run: ./.github/scripts/Test-RosEvidence.ps1 -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -Root "$env:RUNNER_TEMP/ros-evidence"
+        run: ./.github/scripts/Test-LayeredRosEvidence.ps1 -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -Root "$env:RUNNER_TEMP/ros-evidence"
       - uses: actions/upload-artifact@v4
         with:
           name: python-preflight-evidence
