@@ -280,6 +280,15 @@ jobs:
           $c = $env:CANDIDATE_JSON | ConvertFrom-Json
           Assert-PythonProducer $c
           ./tools/.github/scripts/Resolve-WssRelease.ps1 -RunId $c.run_id -ExpectedArtifactId $c.artifact_id -ExpectedCommit $c.commit -ArchiveName $c.archive -ExpectedSha256 $c.sha256 -OutputRoot "$env:RUNNER_TEMP/resolved"
+      - name: Verify exact universal package and Core rejection fixtures
+        if: runner.os == 'Linux'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & dotnet build workflow-guard/tools/ArtifactBuild/ArtifactBuild.csproj -p:RestoreLockedMode=true --nologo
+          if ($LASTEXITCODE -ne 0) { throw 'Locked Core package verifier build failed.' }
+          & python workflow-guard/tests/Packaging/verify_universal.py "$env:RUNNER_TEMP/resolved/extracted/WSS-Universal"
+          if ($LASTEXITCODE -ne 0) { throw 'Exact universal package or Core rejection fixture failed.' }
       - name: Check actual application contracts, model and platform runtime
         shell: pwsh
         env:
