@@ -8,6 +8,7 @@ param(
     [Parameter(Mandatory)][string]$TestRoot,
     [ValidateSet('committed','candidate')][string]$Mode='committed',
     [string]$ArtifactRoot='',[string]$CandidatePath='',[string]$PythonExe='python',
+    [ValidateSet('all','baseline','selected')][string]$Phase='all',
     [switch]$SelectionEnabledCampaign
 )
 $ErrorActionPreference='Stop'
@@ -25,7 +26,7 @@ if($Mode -ceq 'candidate'){$options.ArtifactRoot=$ArtifactRoot;$options.Candidat
 . "$PSScriptRoot/RosCapabilityProfile.ps1"
 if($Mode -ceq 'candidate'){
     $candidate=Get-Content -LiteralPath $CandidatePath -Raw | ConvertFrom-Json
-    $profilePayload=Join-Path $OutputRoot 'profile-projection'
+    $profilePayload=Join-Path $OutputRoot ('profile-projection-'+$Phase)
     $projection=New-PythonProjection $ArtifactRoot $WrapperRoot $profilePayload $candidate
 }else{
     $projection=Get-Content -LiteralPath (Join-Path $WrapperRoot '.github/python-candidate.json') -Raw | ConvertFrom-Json
@@ -41,14 +42,16 @@ switch -CaseSensitive ($config.fixture_sha256) {
     '14313786be4d5c6daea28e40d2f48567cbc1356feb0f0309e0a212339137923b' {$runner='Invoke-LayeredRosConformance.ps1';$options.Stage='all'}
     default {throw 'Unsupported canonical fixture profile; no fallback.'}
 }
-# A selected suite is additional to the actual product baseline.
+# Parent runs these phases in separate children and binds the baseline between them.
+if($Phase -cne 'selected') {
 & (Join-Path $PSScriptRoot $runner) @options
 if(!$?){throw 'Mandatory ROS baseline failed.'}
+    $profile | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $OutputRoot 'profile.json')
+}
+if($Phase -ceq 'baseline'){return}
 $options.OutputRoot=Join-Path $OutputRoot 'selected-canonical'
 $options.TestRoot=$TestRoot
 & (Join-Path $PSScriptRoot $runner) @options
 if(!$?){throw 'Selected ROS canonical suite failed.'}
 & $PythonExe -I -B "$PSScriptRoot/selected_ros_tests.py" run --tests $TestRoot --ros $RosRoot --wrapper $WrapperRoot --output (Join-Path $OutputRoot 'selected-own')
 if($LASTEXITCODE -ne 0){throw 'Selected ROS full inventory failed.'}
-
-$profile | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $OutputRoot 'profile.json')

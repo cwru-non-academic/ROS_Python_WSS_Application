@@ -19,26 +19,40 @@ function Invoke-ReviewedSelectionCore($CoreRoot,$Operation,$TargetId,$ContextPat
 }
 $realChild=${function:Invoke-RosIsolatedChild}
 function Invoke-RosIsolatedChild($Script,$Options) {
-    $script:events.Add('child')
+    $script:events.Add($Options.Phase)
     if($Options.TestRoot -cne $roots.test_root -or $Options.RosRoot -cne $roots.products[0].path){throw 'Root selection changed.'}
     if($script:failure -ceq 'child'){throw 'Injected child failure'}
+    if($Options.Phase -ceq 'baseline') {
+        $baseline=Join-Path $Options.OutputRoot 'baseline'
+        $null=New-Item -ItemType Directory -Path $baseline -Force
+        '{"profile":"legacy-v1"}' | Set-Content (Join-Path $Options.OutputRoot 'profile.json')
+        foreach($file in @('evidence.json','results.xml','dotnet.log','projection.json')){'baseline proof' | Set-Content (Join-Path $baseline $file)}
+    } elseif($script:failure -ceq 'mutate-baseline') {
+        $probe=Join-Path $temp 'mutate-baseline.ps1'
+        'param([string]$EvidencePath); "tampered" | Set-Content -LiteralPath $EvidencePath' | Set-Content $probe
+        & $realChild $probe @{EvidencePath=(Join-Path (Join-Path $Options.OutputRoot 'baseline') 'results.xml')}
+    }
+}
+function Invoke-RosContextTest {
+    param($CoreRoot,$ContextPath,$RootsPath,$WorkRoot,$ToolsRoot)
+    Invoke-RosSelectedWithContext -CoreRoot $CoreRoot -ContextPath $ContextPath -RootsPath $RootsPath -WorkRoot ($WorkRoot+'-'+[guid]::NewGuid().ToString('N')) -ToolsRoot $ToolsRoot
 }
 $options=@{CoreRoot=(Join-Path $temp 'core');ContextPath=(Join-Path $temp 'context.json');RootsPath=(Join-Path $temp 'roots.json');WorkRoot=(Join-Path $temp 'output');ToolsRoot=$roots.products[1].path}
-Invoke-RosSelectedWithContext @options
-if(($events -join ',') -cne 'inspect,child,evidence'){throw 'Core verification ordering changed.'}
+Invoke-RosContextTest @options
+if(($events -join ',') -cne 'inspect,baseline,selected,evidence'){throw 'Core verification ordering changed.'}
 $script:observedCampaign=$null
 $recordingChild=${function:Invoke-RosIsolatedChild}
-function Invoke-RosIsolatedChild($Script,$Options){$script:observedCampaign=$Options.SelectionEnabledCampaign}
+function Invoke-RosIsolatedChild($Script,$Options){$script:observedCampaign=$Options.SelectionEnabledCampaign; & $recordingChild $Script $Options}
 '{"scope":"campaign"}' | Set-Content (Join-Path $temp 'context.json')
-Invoke-RosSelectedWithContext @options
+Invoke-RosContextTest @options
 if($observedCampaign -cne $true){throw 'Authenticated campaign lost modern-only requirement.'}
 '{"scope":"run"}' | Set-Content (Join-Path $temp 'context.json')
-Invoke-RosSelectedWithContext @options
+Invoke-RosContextTest @options
 if($observedCampaign -cne $false){throw 'Ordinary run incorrectly forced modern.'}
 ${function:Invoke-RosIsolatedChild}=$recordingChild
-foreach($failure in @('inspect','child')){
+foreach($failure in @('inspect','child','mutate-baseline')){
     $events.Clear();$script:failure=$failure;$rejected=$false
-    try{Invoke-RosSelectedWithContext @options}catch{$rejected=$true}
+    try{Invoke-RosContextTest @options}catch{$rejected=$true}
     if(!$rejected -or $events.Contains('evidence')){throw 'Failure emitted evidence.'}
 }
 $script:failure=''

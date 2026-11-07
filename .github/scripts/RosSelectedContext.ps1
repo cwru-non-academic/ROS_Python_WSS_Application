@@ -15,6 +15,19 @@ function Invoke-RosIsolatedChild([string]$Script,[hashtable]$Options) {
     if($process.ExitCode -ne 0){throw 'Mandatory or selected ROS suite failed; no selection evidence emitted.'}
 }
 
+function Get-RosBaselineSnapshot([string]$Root,[string]$Profile) {
+    if (!(Test-Path -LiteralPath $Root -PathType Container)) { throw 'Mandatory baseline output is missing.' }
+    $stages=if($Profile -ceq 'layered-v1'){@('', 'multi')}elseif($Profile -ceq 'legacy-v1'){@('')}else{throw 'Unknown baseline evidence profile.'}
+    foreach($stage in $stages){foreach($name in @('evidence.json','results.xml','dotnet.log','projection.json')){
+        if(!(Test-Path -LiteralPath (Join-Path (Join-Path $Root $stage) $name) -PathType Leaf)){throw 'Mandatory baseline evidence file is missing.'}
+    }}
+    $entries=@(Get-ChildItem -LiteralPath $Root -Recurse -Force)
+    if((Get-Item -LiteralPath $Root -Force).Attributes -band [IO.FileAttributes]::ReparsePoint -or @($entries | Where-Object {$_.Attributes -band [IO.FileAttributes]::ReparsePoint}).Count){throw 'Baseline output cannot contain redirected paths.'}
+    @($entries | Where-Object {!$_.PSIsContainer} | ForEach-Object {
+        [IO.Path]::GetRelativePath($Root,$_.FullName).Replace('\','/')+'|'+(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+    } | Sort-Object -CaseSensitive) -join "`n"
+}
+
 function Invoke-RosSelectedWithContext {
     [CmdletBinding()]
     param(
@@ -52,6 +65,15 @@ function Invoke-RosSelectedWithContext {
     } elseif($ArtifactRoot -or $CandidatePath){throw 'Committed mode cannot accept candidate overrides.'}
     $options=@{RosRoot=$ros.path;RosSha=$ros.commit;WrapperRoot=$wrapper.path;WrapperSha=$wrapper.commit;FixtureRoot=$fixture.path;ToolsRoot=$ToolsRoot;ConfigPath=(Join-Path $wrapper.path '.github/python-ci.json');OutputRoot=$work;Mode=$Mode;PythonExe=$PythonExe;TestRoot=$roots.test_root;SelectionEnabledCampaign=($context.scope -ceq 'campaign')}
     if($Mode -ceq 'candidate'){$options.ArtifactRoot=$ArtifactRoot;$options.CandidatePath=$CandidatePath}
+    $options.Phase='baseline'
     Invoke-RosIsolatedChild (Join-Path $PSScriptRoot 'Invoke-SelectedRosTests.ps1') $options
+    $profilePath=Join-Path $work 'profile.json'
+    $profile=Get-Content -LiteralPath $profilePath -Raw | ConvertFrom-Json
+    $profileHash=(Get-FileHash -LiteralPath $profilePath -Algorithm SHA256).Hash
+    $baselineRoot=Join-Path $work 'baseline'
+    $baselineSnapshot=Get-RosBaselineSnapshot $baselineRoot $profile.profile
+    $options.Phase='selected'
+    Invoke-RosIsolatedChild (Join-Path $PSScriptRoot 'Invoke-SelectedRosTests.ps1') $options
+    if((Get-FileHash -LiteralPath $profilePath -Algorithm SHA256).Hash -cne $profileHash -or (Get-RosBaselineSnapshot $baselineRoot $profile.profile) -cne $baselineSnapshot){throw 'Selected suite changed mandatory ROS baseline output; no selection evidence emitted.'}
     Invoke-ReviewedSelectionCore $CoreRoot evidence 'python-ros' $ContextPath $RootsPath (Join-Path $work 'selection/evidence.json')
 }
