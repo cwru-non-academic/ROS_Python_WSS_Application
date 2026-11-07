@@ -141,7 +141,8 @@ jobs:
         shell: pwsh
         run: |
           . ./source/.github/scripts/RosOrdinaryTooling.ps1
-          $toolsSha=Get-RosOrdinaryToolsSha "$env:GITHUB_WORKSPACE/source"
+          $toolsSha=Get-RosOrdinaryToolsSha "$env:GITHUB_WORKSPACE/source" $env:GITHUB_SHA
+          Assert-RosOrdinaryToolsCheckout "$env:GITHUB_WORKSPACE/tools" $toolsSha
           . ./tools/.github/scripts/PythonContract.ps1
           . ./tools/.github/scripts/PythonProfiles/Tooling.ps1
           $wrapperSha=(git -C wrapper rev-parse HEAD).Trim()
@@ -229,7 +230,8 @@ jobs:
         shell: pwsh
         run: |
           . ./source/.github/scripts/RosOrdinaryTooling.ps1
-          $toolsSha=Get-RosOrdinaryToolsSha "$env:GITHUB_WORKSPACE/source"
+          $toolsSha=Get-RosOrdinaryToolsSha "$env:GITHUB_WORKSPACE/source" $env:GITHUB_SHA
+          Assert-RosOrdinaryToolsCheckout "$env:GITHUB_WORKSPACE/tools" $toolsSha
           . ./tools/.github/scripts/PythonContract.ps1
           . ./tools/.github/scripts/PythonProfiles/Tooling.ps1
           $wrapperSha=(git -C wrapper rev-parse HEAD).Trim()
@@ -453,7 +455,8 @@ jobs:
         shell: pwsh
         run: |
           . ./source/.github/scripts/RosOrdinaryTooling.ps1
-          $toolsSha=Get-RosOrdinaryToolsSha "$env:GITHUB_WORKSPACE/source"
+          $toolsSha=Get-RosOrdinaryToolsSha "$env:GITHUB_WORKSPACE/source" $env:GITHUB_SHA
+          Assert-RosOrdinaryToolsCheckout "$env:GITHUB_WORKSPACE/tools" $toolsSha
           . ./tools/.github/scripts/PythonContract.ps1
           . ./tools/.github/scripts/PythonProfiles/Tooling.ps1
           $wrapperSha=(git -C wrapper rev-parse HEAD).Trim()
