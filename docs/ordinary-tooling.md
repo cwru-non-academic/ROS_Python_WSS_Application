@@ -39,6 +39,7 @@ changed. No selection is activated by this change.
 
 Native Humble colcon/DDS, Linux, macOS Intel/ARM and complete source/run-bound
 native acceptance must still pass hosted CI after the supported tooling refresh.
-The old literal7df83 pin intentionally remains until the reviewed shared bootstrap
-has matching dev/main identity and an immutable published anchor. Do not publish
-this workflow as ready or replace the pin merely to turn a check green.
+The supported d965 adapter-pin refresh now binds reviewed Python tooling
+9c375d7d39b7fe212483112effcdcdd5b61cf381, whose protected source trees match
+dev/main and whose full-SHA tooling anchor is retained. The existing pin guard
+verifies this identity; this tooling update does not imply product adoption.
