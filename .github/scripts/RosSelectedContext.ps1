@@ -2,7 +2,7 @@
 
 function Invoke-RosIsolatedChild([string]$Script,[hashtable]$Options) {
     # A child interpreter prevents selected code seeing parent's saved-token variables.
-    $start=[Diagnostics.ProcessStartInfo]::new((Get-Command pwsh -CommandType Application -ErrorAction Stop).Source)
+    $start=[Diagnostics.ProcessStartInfo]::new((Get-Command pwsh -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source)
     $start.UseShellExecute=$false
     $start.CreateNoWindow=$true
     foreach($name in @($start.Environment.Keys)) {
