@@ -27,7 +27,11 @@ if ($Mode -ceq 'committed') {
     if (!$ToolsSha) { throw 'Ordinary ROS platform requires an explicit immutable tooling SHA.' }
     $candidateOptions.ToolsRoot=$ToolsRoot; $candidateOptions.ToolsSha=$ToolsSha; $candidateOptions.ConfigPath=Join-Path $ToolsRoot '.github/python-ci.json'
 }
-if ($Mode -ceq 'candidate') { $candidateOptions.ArtifactRoot=$ArtifactRoot; $candidateOptions.CandidatePath=$CandidatePath }
+if ($Mode -ceq 'candidate') {
+    if (!$ToolsSha) { throw 'Candidate ROS platform requires an explicit immutable tooling SHA.' }
+    $candidateOptions.ToolsRoot=$ToolsRoot; $candidateOptions.ToolsSha=$ToolsSha; $candidateOptions.ConfigPath=Join-Path $ToolsRoot '.github/python-ci.json'
+    $candidateOptions.ArtifactRoot=$ArtifactRoot; $candidateOptions.CandidatePath=$CandidatePath
+}
 & (Join-Path $ToolsRoot '.github/scripts/Invoke-PlatformCompatibility.ps1') @candidateOptions -WrapperRoot $WrapperRoot -WrapperSha $WrapperSha -FixtureRoot $FixtureRoot -OutputRoot (Join-Path $OutputRoot 'wrapper-platform') -PythonExe $PythonExe
 if (!$?) { throw 'Shared Python platform compatibility failed.' }
 Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue
