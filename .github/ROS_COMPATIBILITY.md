@@ -1,11 +1,14 @@
 # ROS compatibility work and pipeline handoff
 
 Baseline commit `0cb18e0` captures ten passing contract tests before changes at
-wrapper `60f29a8cf4c777bcc85d2f8d90da1abde46079ea`. The complete pin now selects
-Python integration `94d78c49a622bd4d15587f869c4cd5ac063c13b8`, containing Core
+wrapper `60f29a8cf4c777bcc85d2f8d90da1abde46079ea`. That initial receiver rollout
+selected Python integration `94d78c49a622bd4d15587f869c4cd5ac063c13b8`, containing Core
 `5ec22900587587e9e9465ffa53d04d7d1ce13545`. Its candidate manifest binds producer
 run `39092192696`, artifact `12123267360`, archive SHA256
 `3bc303096594978fa77e95cd80901a8fb72d26c42a7408c38c8668563b6f1a7e`.
+Those identities record the initial rollout, not current acceptance. The current
+product comes from the committed `HFI_WSS_Python_Interface` gitlink and its
+candidate manifest; workflow-owned tooling pins are separate.
 `Verify-RosPayload.ps1` reuses the pinned library's canonical full-inventory and
 digest checks. None of those checks is a runtime external-install allowlist.
 
@@ -58,11 +61,14 @@ Endpoints are `wss-preflight.yml` with inputs `candidate_json`,
 `cwru-non-academic/ROS_Python_WSS_Application`.
 
 The implementation follows the [published v2 contract](https://github.com/cwru-non-academic/Python_WSS_Integration_Lib/blob/bb3bb0c3bb2caf5c1e0f6a9924d651b49c6467a6/.github/PYTHON_FANOUT_CONTRACT.md).
-Candidate and ordinary CI pin shared receiver tools to
+The initial v2 receiver pinned shared tools to
 `94d78c49a622bd4d15587f869c4cd5ac063c13b8` (Python wrapper PR #8), and the
 macOS-aware shared C# fixture to `02172a64c55becd5535204f46f10b4755bf3ee05`
-(C# PR #22). Those source PRs require human review independently of this receiver.
-The canonical ten cases and eighteen assertions are unchanged.
+(C# PR #22), retaining the legacy ten cases and eighteen assertions. Those
+identities are historical. Current candidate and ordinary workflows declare
+their reviewed tooling pins explicitly. Ordinary CI resolves canonical fixtures
+and required coverage from the verified payload capability profile; the product
+gitlink does not select tooling.
 Promotion deliberately uses reviewed tools on library `dev`, validates v2 proof
 before target-only dispatch/write tokens, re-preflights the actual merged wrapper,
 and permits only the `HFI_WSS_Python_Interface` gitlink change. A CLI-only v1
@@ -70,27 +76,34 @@ approval is rejected for ROS. No CLI approval is reused as ROS approval.
 Evidence binds exact ROS/wrapper source SHAs,
 candidate producer/artifact/archive tuple, full payload digest, development host
 and runtime, fixture identities, independent model and ROS/layout results, and
-result/log hashes. Canonical ten shared cases remain unchanged and separate;
+result/log hashes. Canonical profile cases remain unchanged and separate;
 they do not by themselves cover ROS callbacks or StimWithMode. Require successful
 non-skipped ROS jobs, fresh post-merge wrapper validation, source race checks,
 target-specific idempotency and human-reviewed gitlink-only PRs. No merge/release
 or final Core propagation experiment is authorized by these checks.
 
-The Windows job runs the exact ten canonical NUnit cases through
+The canonical Windows runners execute the verified profile's NUnit corpus through
 `create_controller`, the same production factory used by node setup. Only the
-canonical fixture's controller factory/type alias changes; its eighteen assertion
-expressions and all scenario values remain unchanged. ROS dependencies are
-doubled in that embedded Python host. It supplements, rather than replaces, the
-real-model and native ROS suites. The complete verified payload is transferred
-by hash to the Humble job and installed as a fresh directory, never overlaid.
+fixture's controller factory/type alias changes; its canonical cases, assertion
+expressions and scenario values remain preserved. The retained legacy runner has
+its original single-device corpus; layered coverage requires both single-device
+and multi-device stages. ROS dependencies are doubled in that embedded Python
+host. It supplements, rather than replaces, the real-model and native ROS suites.
+The complete verified payload is transferred by hash to the Humble job and
+installed as a fresh directory, never overlaid.
 
-The `python-preflight-evidence` artifact contains exactly `evidence.json`,
-`results.xml`, `dotnet.log`, `projection.json`, `ros-model.json`,
-`ros-native-symlink.json`, and `ros-native-copy.json`. Shared validators check
-report coverage and file hashes. Negative safety checks reject stale/tampered
-reports, skipped model cases, incomplete model scenarios, missing DDS channels,
-and CLI-only approvals. Ordinary CI produces the same evidence structure under
-`ros-compatibility-evidence`, with mode `committed`; it is not a candidate approval.
+The retained legacy evidence schema contains `evidence.json`, `results.xml`,
+`dotnet.log`, `projection.json`, `ros-model.json`, `ros-native-symlink.json`, and
+`ros-native-copy.json`. Layered evidence additionally requires the canonical
+evidence/result/log/projection files under `multi/`. Current candidate preflight
+runs `Invoke-LayeredRosConformance.ps1` and `Complete-LayeredRosEvidence.ps1`;
+ordinary CI runs `Invoke-ProfiledRosConformance.ps1` and
+`Complete-ProfiledRosEvidence.ps1` and requires the verified profile's complete
+inventory. Shared validators check report coverage and file hashes; negative
+checks reject stale/tampered reports, skipped model cases, incomplete model
+scenarios, missing DDS channels and CLI-only approvals. Candidate and ordinary
+artifacts remain `python-preflight-evidence` and `ros-compatibility-evidence`
+respectively; ordinary `committed` evidence is not candidate approval.
 
 Deployment remains separate: publish these workflows to default `main` and the
 routine `dev` branch through reviewed human merges, and provide existing App
@@ -104,10 +117,10 @@ Ordinary PR and push CI on main/dev exposes these exact checks:
 
 | Check | Executed scope |
 | --- | --- |
-| ROS general conformance | Windows embedded Python host; unchanged ten shared Core cases and eighteen assertions through the production ROS controller factory; ROS APIs doubled. Also assembles/verifies the existing seven-file source-bound proof and runs negative evidence checks after every platform/native suite succeeds |
+| ROS general conformance | Windows embedded Python host; profile-selected canonical corpus preserving cases and assertions through the production ROS controller factory; ROS APIs doubled. Also assembles/verifies the complete profile-specific source-bound evidence and runs negative checks after every platform/native suite succeeds |
 | ROS platform compatibility (Windows) | Actual Python import/layout, public application contracts, lifecycle, five model tests/fifteen device-scenario observations; installed wrapper wheel, actual Ports selection/construction and shared C# Serial/BLE loading tests |
 | ROS platform compatibility (Ubuntu) | The same application and wrapper platform checks on Ubuntu |
-| ROS platform compatibility (macOS) | The same application and wrapper platform checks on x64 macOS; explicit unsupported BLE backend skip recorded in TRX and JSON |
+| ROS platform compatibility (macOS) | Aggregate of native Intel (x64) and Apple Silicon (arm64) consumer lanes, with actual wrapper/backend checks for the verified payload; no physical BLE or native ROS claim |
 | ROS-specific compatibility (Humble) | Actual colcon symlink/copy installs, launch resolution and all nine Float64 topics through native rclpy/DDS on Ubuntu 22.04/Humble; recording managed-layer double, no CLR or transport |
 
 These are the five checks intended for the ordinary PR ruleset. `Stage verified
@@ -123,14 +136,15 @@ preflight workflow.
 The platform jobs execute real application/Core model logic with ROS API doubles;
 they do not install or certify native ROS on Windows or macOS. The separate native
 Ubuntu/Humble check is required to establish the existing ROS development baseline.
-No native ROS test is skipped and relabeled as support on another OS. macOS BLE
-is also explicitly unimplemented, while its other platform checks still execute.
-No job opens a physical serial port or connects to a BLE device.
+No native ROS test is skipped and relabeled as support on another OS. Declared
+macOS BLE payloads must pass backend/runtime checks on both native architectures;
+a verified legacy payload reports explicit unsupported BLE selection rather than
+implying support. No job opens a physical serial port or connects to a BLE device.
 
 The canonical job no longer runs the model/contracts suite. Windows model evidence
 comes from the Windows platform job, and native reports come from the native job;
-the seven-file promotion format, source identities and payload hashes are retained
-inside general conformance.
+the profile-specific complete evidence inventory, source identities and payload
+hashes are retained inside general conformance.
 The candidate-preflight workflow, dispatch/fan-out endpoints, public application
 interface, configuration and Core behavior remain unchanged.
 
@@ -138,13 +152,15 @@ interface, configuration and Core behavior remain unchanged.
 
 The shared validator accepts exactly the legacy 25-file inventory or the declared
 27-file macOS BLE inventory; extra files, undeclared backends and missing declared
-assets fail. The committed payload remains legacy, so a green ordinary macOS job
-does not claim BLE support for that payload.
+assets fail. A verified legacy payload must report explicit unsupported BLE
+selection. A payload declaring macOS BLE must include and validate its managed
+backend and native bridge; missing declared files are failures, never evidence
+of legacy capability.
 
 Candidate preflight now runs ROS platform compatibility on Windows, Ubuntu and
 macOS, in addition to the existing canonical/model and real Humble DDS suites.
-Each platform resolves the exact canonical Core dev-push artifact independently,
-checks producer provenance, and publishes source/run/hash-bound platform and
+Each platform independently resolves the exact canonical Core push artifact for
+the configured channel, checks producer provenance, and publishes source/run/hash-bound platform and
 Python smoke reports. A declared macOS backend must pass ABI, inert context,
 managed backend/factory and shared C# tests. No scan, connection or physical I/O
 is performed. ROS APIs remain doubled in platform/model checks; real native ROS
@@ -154,8 +170,9 @@ Both native colcon layouts verify every installed payload byte against the
 cross-job attested manifest, including the macOS dylib even on the Ubuntu host.
 The existing directory installation rule already copies the complete payload.
 Evidence assembly rejects mismatched installed counts, hashes or projection
-digests. The legacy seven-file candidate proof format, v2 three-consumer proof
-requirement and automatic CLI/ROS fan-out remain intact.
+digests. The retained legacy evidence schema, v2 three-consumer proof requirement
+and automatic CLI/ROS fan-out remain intact; current layered candidate preflight
+additionally requires its complete multi-device evidence.
 
 The five ordinary required check names remain:
 - ROS general conformance
@@ -164,5 +181,5 @@ The five ordinary required check names remain:
 - ROS platform compatibility (macOS)
 - ROS-specific compatibility (Humble)
 
-New-payload promotion waits for reviewed receivers and a canonical Core dev-push
-producer. PR artifacts cannot substitute for that provenance.
+New-payload promotion waits for reviewed receivers and a canonical Core producer
+for the configured channel. PR artifacts cannot substitute for that provenance.

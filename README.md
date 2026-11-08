@@ -131,19 +131,24 @@ ROS CI additionally builds with colcon on a **development baseline** of ROS 2
 Humble / Ubuntu 22.04 x64, checks symlink and copied installs, resolves the same
 launch command, and exercises all nine `Float64` topics through real rclpy/DDS
 with a recording managed-layer double. It never opens a serial/BLE transport.
-Separate Windows, Ubuntu and x64 macOS CPython 3.12 / pythonnet 3.0.5 / .NET 9
+Separate Windows, Ubuntu and macOS CPython 3.12 / pythonnet 3.0.5 / .NET 9
 platform jobs test application contracts and the actual wrapper/Core model path
 with Core's in-memory emulator, plus runtime/backend loading. Their ROS APIs are
-doubled; native ROS coverage remains the separate Ubuntu/Humble job. See
+doubled; native ROS coverage remains the separate Ubuntu/Humble job. The macOS
+aggregate requires native Intel and Apple Silicon lanes. See
 [tests/BASELINE.md](tests/BASELINE.md) and [.github/ROS_COMPATIBILITY.md](.github/ROS_COMPATIBILITY.md).
 These are development checks, not certification of every ROS distro or hardware.
 
-The separate `ROS general conformance` Windows job executes the unchanged ten-case canonical NUnit corpus
-through the same controller factory used by ROS node setup, preserving all
-eighteen assertions. Its results, the separate model report and both native
-layout reports form seven source-bound evidence files. Normal CI evidence is
-not candidate approval: automatic promotion additionally requires the reviewed
-v2 wrapper/CLI/ROS proof and a fresh preflight of the actual merged wrapper.
+The separate `ROS general conformance` Windows job executes the canonical
+NUnit corpus selected by the verified payload capability profile through the
+same controller factory used by ROS node setup, preserving that profile's
+canonical cases and assertion expressions. It requires the single-device stage
+for every supported profile and the additional multi-device stage for
+`layered-v1`. Its profile-specific canonical evidence, separate model report
+and both native layout reports form the complete source-bound evidence set.
+Normal CI evidence is not candidate approval: automatic promotion additionally
+requires the reviewed v2 wrapper/CLI/ROS proof and a fresh preflight of the
+actual merged wrapper.
 The three OS checks are named `ROS platform compatibility (Windows)`,
 `ROS platform compatibility (Ubuntu)` and `ROS platform compatibility (macOS)`.
 `ROS-specific compatibility (Humble)` retains the real colcon/DDS checks.
@@ -190,8 +195,11 @@ these template changes do not rewrite existing user configuration. Core keeps
 its existing normalization behavior for invalid address values.
 Keep the firmware and calibration values appropriate to your hardware.
 
-After changing receiver addresses, stop and restart the application so Core
-constructs a new address map. The CLI `reload-core` command does not rebuild that map.
+After changing receiver addresses, stop and restart the ROS driver so Core
+constructs a new address map. The driver reads `config_path` during startup and
+does not expose a reload command or ROS reload service. The pinned Python
+wrapper provides `LoadCoreConfigFile()` and `LoadParamsJson()` for callers using
+its API directly; the ROS driver does not call these methods.
 Setup continues asynchronously after controller initialization. An initialized
 application or an advancing tick loop does not establish that a device is ready.
 Core setup and tick errors are recorded in the configured log file; check the
