@@ -54,6 +54,8 @@ function Assert-ReceiptRetirementStep([string]$Workflow) {
         with:
           node-version: '24'
 '@).Replace("`r`n","`n")+"`n"
+    $blocks=@([regex]::Matches($job,'(?ms)^      - name: Verify retired receipt entrypoint contract\n.*?(?=^      - |\z)'))
+    if($blocks.Count -ne 1 -or $blocks[0].Value -cne $step){throw 'Receipt retirement test step must have exactly its reviewed executable fields.'}
     if(!$job -or $job -match '(?m)^    (if|continue-on-error):' -or !$job.Contains($step) -or [regex]::Matches($job,'(?m)^        run: node --test \.github/scripts/tests/ReceiptEntrypointRetirement\.test\.mjs$').Count -ne 1){throw 'Ordinary CI must execute the complete unconditional retired receipt test step.'}
     if($job.IndexOf($node) -lt 0 -or $job.IndexOf($node) -gt $job.IndexOf($step)){throw 'Receipt retirement contract requires Node 24 before its test step.'}
     if($job.IndexOf('      - uses: actions/checkout@v4') -lt 0 -or $job.IndexOf('      - uses: actions/checkout@v4') -gt $job.IndexOf($step)){throw 'Receipt retirement contract requires its source checkout first.'}
@@ -71,6 +73,7 @@ foreach($changed in @(
     $retirementWorkflow.Replace($retirementStep,$retirementStep.Replace('        shell: pwsh',"        if: false`n        shell: pwsh")),
     $retirementWorkflow.Replace($retirementStep,$retirementStep.Replace('        shell: pwsh',"        continue-on-error: true`n        shell: pwsh")),
     $retirementWorkflow.Replace($retirementStep,$retirementStep.Replace('node --test','echo skipped')),
+    $retirementWorkflow.Replace($retirementStep,($retirementStep+"        if: false`n")),
     $retirementWorkflow.Replace("node-version: '24'","node-version: '20'"),
     $retirementWorkflow.Replace("  preflight-context-contracts:`n","  preflight-context-contracts:`n    if: false`n")
 )) {
@@ -78,4 +81,4 @@ foreach($changed in @(
     $rejected=$false;try{Assert-ReceiptRetirementStep $changed}catch{$rejected=$true}
     if(!$rejected){throw 'Disabled retirement workflow test was accepted.'}
 }
-Write-Output 'PASS: retired receipt hosted step and six disabling mutations.'
+Write-Output 'PASS: retired receipt hosted step and seven disabling mutations.'
