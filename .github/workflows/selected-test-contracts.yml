@@ -31,3 +31,10 @@ jobs:
       - name: Reject actual child mutations of parent authority and baseline
         shell: pwsh
         run: ./.github/scripts/tests/Test-SelectedParentSnapshot.ps1
+      - name: Install pinned workflow parser
+        run: python -m pip install PyYAML==6.0.3
+      - name: Verify candidate tooling forwarding and SDK cache policy
+        shell: pwsh
+        run: |
+          ./.github/scripts/tests/CandidatePlatformTooling.Tests.ps1
+          ./.github/scripts/tests/RestoredAssetsRunnerArguments.Tests.ps1
