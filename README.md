@@ -131,10 +131,11 @@ ROS CI additionally builds with colcon on a **development baseline** of ROS 2
 Humble / Ubuntu 22.04 x64, checks symlink and copied installs, resolves the same
 launch command, and exercises all nine `Float64` topics through real rclpy/DDS
 with a recording managed-layer double. It never opens a serial/BLE transport.
-Separate Windows, Ubuntu and x64 macOS CPython 3.12 / pythonnet 3.0.5 / .NET 9
+Separate Windows, Ubuntu and macOS CPython 3.12 / pythonnet 3.0.5 / .NET 9
 platform jobs test application contracts and the actual wrapper/Core model path
 with Core's in-memory emulator, plus runtime/backend loading. Their ROS APIs are
-doubled; native ROS coverage remains the separate Ubuntu/Humble job. See
+doubled; native ROS coverage remains the separate Ubuntu/Humble job. The macOS
+aggregate requires native Intel and Apple Silicon lanes. See
 [tests/BASELINE.md](tests/BASELINE.md) and [.github/ROS_COMPATIBILITY.md](.github/ROS_COMPATIBILITY.md).
 These are development checks, not certification of every ROS distro or hardware.
 
