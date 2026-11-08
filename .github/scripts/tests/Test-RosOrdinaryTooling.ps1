@@ -40,3 +40,42 @@ if($ToolsRoot){
     Reject 'wrapper gitlink substitution' {Assert-RosOrdinaryProductPair $RosRoot $RosSha ('a'*40)}
 }
 Write-Output 'PASS: ordinary ROS tooling and product bindings.'
+# Keep the retired frontend contract in an actual ordinary CI job, not only local tests.
+function Assert-ReceiptRetirementStep([string]$Workflow) {
+    $text=$Workflow.Replace("`r`n","`n")
+    $job=[regex]::Match($text,'(?ms)^  preflight-context-contracts:\n(?<body>.*?)(?=^  [a-zA-Z0-9_-]+:\n|\z)').Groups['body'].Value
+    $step=(@'
+      - name: Verify retired receipt entrypoint contract
+        shell: pwsh
+        run: node --test .github/scripts/tests/ReceiptEntrypointRetirement.test.mjs
+'@).Replace("`r`n","`n")+"`n"
+    $node=(@'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+'@).Replace("`r`n","`n")+"`n"
+    if(!$job -or $job -match '(?m)^    (if|continue-on-error):' -or !$job.Contains($step) -or [regex]::Matches($job,'(?m)^        run: node --test \.github/scripts/tests/ReceiptEntrypointRetirement\.test\.mjs$').Count -ne 1){throw 'Ordinary CI must execute the complete unconditional retired receipt test step.'}
+    if($job.IndexOf($node) -lt 0 -or $job.IndexOf($node) -gt $job.IndexOf($step)){throw 'Receipt retirement contract requires Node 24 before its test step.'}
+    if($job.IndexOf('      - uses: actions/checkout@v4') -lt 0 -or $job.IndexOf('      - uses: actions/checkout@v4') -gt $job.IndexOf($step)){throw 'Receipt retirement contract requires its source checkout first.'}
+}
+$retirementWorkflow=Get-Content (Join-Path $repository '.github/workflows/ros-ci.yml') -Raw
+Assert-ReceiptRetirementStep $retirementWorkflow
+$retirementStep=(@'
+      - name: Verify retired receipt entrypoint contract
+        shell: pwsh
+        run: node --test .github/scripts/tests/ReceiptEntrypointRetirement.test.mjs
+'@).Replace("`r`n","`n")+"`n"
+$retirementWorkflow=$retirementWorkflow.Replace("`r`n","`n")
+foreach($changed in @(
+    $retirementWorkflow.Replace($retirementStep,''),
+    $retirementWorkflow.Replace($retirementStep,$retirementStep.Replace('        shell: pwsh',"        if: false`n        shell: pwsh")),
+    $retirementWorkflow.Replace($retirementStep,$retirementStep.Replace('        shell: pwsh',"        continue-on-error: true`n        shell: pwsh")),
+    $retirementWorkflow.Replace($retirementStep,$retirementStep.Replace('node --test','echo skipped')),
+    $retirementWorkflow.Replace("node-version: '24'","node-version: '20'"),
+    $retirementWorkflow.Replace("  preflight-context-contracts:`n","  preflight-context-contracts:`n    if: false`n")
+)) {
+    if($changed -ceq $retirementWorkflow){throw 'Retirement workflow mutation did not change its fixture.'}
+    $rejected=$false;try{Assert-ReceiptRetirementStep $changed}catch{$rejected=$true}
+    if(!$rejected){throw 'Disabled retirement workflow test was accepted.'}
+}
+Write-Output 'PASS: retired receipt hosted step and six disabling mutations.'
