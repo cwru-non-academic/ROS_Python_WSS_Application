@@ -10,8 +10,10 @@ env:
 permissions:
   contents: read
 concurrency:
-  group: ros-committed-${{ inputs.correlation_id || github.ref }}
-  cancel-in-progress: false
+  # Only stale PR checks supersede one another. Preserve every committed run.
+  # run_id also prevents pending replacement between same-source dispatches.
+  group: ros-committed-${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}-${{ github.event_name == 'pull_request' && 'latest' || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   preflight-context-contracts:
     name: ROS candidate boundary (${{ matrix.os }})
@@ -76,7 +78,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 7c425c02c7f0a1f52f5e2807a7db43bf29666ef4
+          ref: 38edc3d0b70aeceec2f3e2e66e6856fb867a51cd
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4
@@ -136,7 +138,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 7c425c02c7f0a1f52f5e2807a7db43bf29666ef4
+          ref: 38edc3d0b70aeceec2f3e2e66e6856fb867a51cd
           path: tools
           persist-credentials: false
       - name: Bind ordinary tooling and resolve immutable capability fixture
@@ -225,7 +227,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 7c425c02c7f0a1f52f5e2807a7db43bf29666ef4
+          ref: 38edc3d0b70aeceec2f3e2e66e6856fb867a51cd
           path: tools
           persist-credentials: false
       - name: Bind ordinary tooling and resolve immutable capability fixture
@@ -305,7 +307,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 7c425c02c7f0a1f52f5e2807a7db43bf29666ef4
+          ref: 38edc3d0b70aeceec2f3e2e66e6856fb867a51cd
           path: tools
           persist-credentials: false
       - uses: actions/download-artifact@v4
@@ -444,7 +446,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 7c425c02c7f0a1f52f5e2807a7db43bf29666ef4
+          ref: 38edc3d0b70aeceec2f3e2e66e6856fb867a51cd
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4
