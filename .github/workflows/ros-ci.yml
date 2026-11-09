@@ -78,7 +78,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: aea63a2a895bde4f02340bec7ed3d30f0b107577
+          ref: 76e6ff9c410402ae247440d42c02fcd422fb5f01
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4
@@ -138,7 +138,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: aea63a2a895bde4f02340bec7ed3d30f0b107577
+          ref: 76e6ff9c410402ae247440d42c02fcd422fb5f01
           path: tools
           persist-credentials: false
       - name: Bind ordinary tooling and resolve immutable capability fixture
@@ -227,7 +227,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: aea63a2a895bde4f02340bec7ed3d30f0b107577
+          ref: 76e6ff9c410402ae247440d42c02fcd422fb5f01
           path: tools
           persist-credentials: false
       - name: Bind ordinary tooling and resolve immutable capability fixture
@@ -307,7 +307,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: aea63a2a895bde4f02340bec7ed3d30f0b107577
+          ref: 76e6ff9c410402ae247440d42c02fcd422fb5f01
           path: tools
           persist-credentials: false
       - uses: actions/download-artifact@v4
@@ -446,7 +446,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: aea63a2a895bde4f02340bec7ed3d30f0b107577
+          ref: 76e6ff9c410402ae247440d42c02fcd422fb5f01
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4
