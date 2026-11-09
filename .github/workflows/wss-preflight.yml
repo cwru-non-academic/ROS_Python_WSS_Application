@@ -99,7 +99,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 12822b0567c918daa04bf486afca951adde9fca0
+          ref: 42180c66544583ef20576dbae118a9df8590e344
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4
@@ -250,7 +250,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 12822b0567c918daa04bf486afca951adde9fca0
+          ref: 42180c66544583ef20576dbae118a9df8590e344
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4
@@ -300,7 +300,10 @@ jobs:
         env:
           WRAPPER_SHA: ${{ needs.python-core.outputs.wrapper }}
         run: |
-          ./source/.github/scripts/Invoke-RosPlatformCompatibility.ps1 -RosRoot "$env:GITHUB_WORKSPACE/source" -RosSha $env:GITHUB_SHA -WrapperRoot "$env:GITHUB_WORKSPACE/wrapper" -WrapperSha $env:WRAPPER_SHA -FixtureRoot "$env:GITHUB_WORKSPACE/fixture" -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -OutputRoot "$env:RUNNER_TEMP/ros-platform" -Mode candidate -ArtifactRoot "$env:RUNNER_TEMP/resolved/extracted/WSS-Universal" -CandidatePath "$env:RUNNER_TEMP/resolved/candidate.json"
+          . ./source/.github/scripts/RosOrdinaryTooling.ps1
+          $toolsSha=Get-RosOrdinaryToolsSha "$env:GITHUB_WORKSPACE/source" $env:GITHUB_SHA
+          Assert-RosOrdinaryToolsCheckout "$env:GITHUB_WORKSPACE/tools" $toolsSha
+          ./source/.github/scripts/Invoke-RosPlatformCompatibility.ps1 -RosRoot "$env:GITHUB_WORKSPACE/source" -RosSha $env:GITHUB_SHA -WrapperRoot "$env:GITHUB_WORKSPACE/wrapper" -WrapperSha $env:WRAPPER_SHA -FixtureRoot "$env:GITHUB_WORKSPACE/fixture" -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -ToolsSha $toolsSha -OutputRoot "$env:RUNNER_TEMP/ros-platform" -Mode candidate -ArtifactRoot "$env:RUNNER_TEMP/resolved/extracted/WSS-Universal" -CandidatePath "$env:RUNNER_TEMP/resolved/candidate.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -353,7 +356,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 12822b0567c918daa04bf486afca951adde9fca0
+          ref: 42180c66544583ef20576dbae118a9df8590e344
           path: tools
           persist-credentials: false
       - uses: actions/checkout@v4
@@ -394,7 +397,10 @@ jobs:
         env:
           WRAPPER_SHA: ${{ needs.python-core.outputs.wrapper }}
         run: |
-          ./source/.github/scripts/Invoke-RosPlatformCompatibility.ps1 -RosRoot "$env:GITHUB_WORKSPACE/source" -RosSha $env:GITHUB_SHA -WrapperRoot "$env:GITHUB_WORKSPACE/wrapper" -WrapperSha $env:WRAPPER_SHA -FixtureRoot "$env:GITHUB_WORKSPACE/fixture" -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -OutputRoot "$env:RUNNER_TEMP/ros-platform" -Mode candidate -ArtifactRoot "$env:RUNNER_TEMP/resolved/extracted/WSS-Universal" -CandidatePath "$env:RUNNER_TEMP/resolved/candidate.json"
+          . ./source/.github/scripts/RosOrdinaryTooling.ps1
+          $toolsSha=Get-RosOrdinaryToolsSha "$env:GITHUB_WORKSPACE/source" $env:GITHUB_SHA
+          Assert-RosOrdinaryToolsCheckout "$env:GITHUB_WORKSPACE/tools" $toolsSha
+          ./source/.github/scripts/Invoke-RosPlatformCompatibility.ps1 -RosRoot "$env:GITHUB_WORKSPACE/source" -RosSha $env:GITHUB_SHA -WrapperRoot "$env:GITHUB_WORKSPACE/wrapper" -WrapperSha $env:WRAPPER_SHA -FixtureRoot "$env:GITHUB_WORKSPACE/fixture" -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -ToolsSha $toolsSha -OutputRoot "$env:RUNNER_TEMP/ros-platform" -Mode candidate -ArtifactRoot "$env:RUNNER_TEMP/resolved/extracted/WSS-Universal" -CandidatePath "$env:RUNNER_TEMP/resolved/candidate.json"
       - name: Record native macOS architecture worker outcome
         if: always()
         shell: pwsh
@@ -429,7 +435,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 12822b0567c918daa04bf486afca951adde9fca0
+          ref: 42180c66544583ef20576dbae118a9df8590e344
           path: tools
           persist-credentials: false
       - uses: actions/download-artifact@v4
@@ -541,7 +547,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: cwru-non-academic/Python_WSS_Integration_Lib
-          ref: 12822b0567c918daa04bf486afca951adde9fca0
+          ref: 42180c66544583ef20576dbae118a9df8590e344
           path: tools
           persist-credentials: false
       - uses: actions/download-artifact@v4
