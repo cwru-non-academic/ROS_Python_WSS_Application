@@ -2,8 +2,8 @@
   "schema": "wss-shared-ci/v2",
   "repository": "cwru-non-academic/ROS_Python_WSS_Application",
   "source_repository": "cwru-non-academic/WSSCore",
-  "source_commit": "3eb48da437841fb705c4e984c839838722e77baf",
-  "source_ref": "refs/heads/ci/tooling/3eb48da437841fb705c4e984c839838722e77baf",
+  "source_commit": "099a0287b4c6ba238112482310c429ac334ea8cf",
+  "source_ref": "refs/heads/ci/tooling/099a0287b4c6ba238112482310c429ac334ea8cf",
   "origins": {
     "integration": {
       "repository": "cwru-non-academic/Python_WSS_Integration_Lib",
