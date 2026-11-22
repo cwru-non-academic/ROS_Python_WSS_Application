@@ -308,7 +308,7 @@ jobs:
         if: always()
         with:
           name: python-preflight-platform-${{ matrix.name }}
-          retention-days: 14
+          retention-days: 90
           if-no-files-found: warn
           path: |
             ${{ runner.temp }}/ros-platform/wrapper-platform/platform.json
@@ -417,7 +417,7 @@ jobs:
         if: always()
         with:
           name: python-preflight-platform-${{ matrix.name }}
-          retention-days: 14
+          retention-days: 90
           if-no-files-found: warn
           path: |
             ${{ runner.temp }}/ros-platform/wrapper-platform/platform.json
@@ -451,7 +451,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: python-preflight-platform-macOS
-          retention-days: 14
+          retention-days: 90
           if-no-files-found: error
           path: ${{ runner.temp }}/macos-complete/
 
@@ -566,6 +566,7 @@ jobs:
         run: ./.github/scripts/Test-LayeredRosEvidence.ps1 -ToolsRoot "$env:GITHUB_WORKSPACE/tools" -Root "$env:RUNNER_TEMP/ros-evidence"
       - uses: actions/upload-artifact@v4
         with:
+          retention-days: 90
           name: python-preflight-evidence
           if-no-files-found: error
           path: ${{ runner.temp }}/ros-evidence/
