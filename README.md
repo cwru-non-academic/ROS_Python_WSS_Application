@@ -1,67 +1,90 @@
 # HFI_ROS_WSS_Driver
 A repository that maps incoming ROS2 stimulation magnitudes to the WSS stimulator.
 
-## Table of Contents
+## First stimulation
 
-- [Dependencies](#dependencies)
-- [Setup Instructions](#setup-instructions)
-- [Running the ROS WSS Driver](#running-the-ros-wss-driver)
-- [Running Unit Tests](#running-unit-tests)
-- [Debugging](#debugging)
+### Install and build on Ubuntu 22.04
 
-## Dependencies
-The table below lists the direct dependencies needed for this repository.
+This walkthrough uses ROS 2 Humble on Ubuntu 22.04 x64. Install [ROS 2 Humble ROS Base using the Ubuntu packages](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html). Install the [.NET runtime](https://learn.microsoft.com/dotnet/core/install/linux-ubuntu) for the same architecture as Python. The WSS platform checks use .NET 9 with CoreCLR. Confirm that `dotnet --list-runtimes` lists `Microsoft.NETCore.App` 9.x.
 
-| **Dependency Name** | **Description** |
-|---------------------|-----------------|
-| `rclpy` | ROS2 Python client library used for subscriptions, launch, and node lifecycle. |
-| `std_msgs` | Provides the `Float64` message type used for stimulation magnitudes. |
-| `HFI_WSS_Python_Interface` | Git submodule containing the Python WSS interface wrapper and bundled WSS DLLs. |
+In Bash:
 
-## Setup Instructions
+```bash
+sudo apt update
+sudo apt install git python3-pip python3-yaml python3-colcon-common-extensions \
+  ros-humble-ament-cmake-python ros-humble-launch-ros ros-humble-ros2launch
+source /opt/ros/humble/setup.bash
+git clone --recurse-submodules https://github.com/cwru-non-academic/ROS_Python_WSS_Application.git
+cd ROS_Python_WSS_Application
+python3 -m pip install --user -r requirements.txt
+colcon build --packages-select hfi_ros_wss_driver --symlink-install
+source install/setup.bash
+```
 
-### Software Setup
+If the wrapper directory is empty, run `git submodule update --init --recursive` before building. The build installs the pinned wrapper and its DLLs. The node uses the system ROS Python, including the `pythonnet` you just installed for that interpreter.
 
-1. **Clone the Repository**:
+### Prepare a portable launch config
+
+Follow the [hardware overview](https://cwru-non-academic.github.io/WSS_Documentation/hardwareDocs/wsshardware.html) for the physical setup and the [bench verification handoff](https://github.com/cwru-non-academic/WSS_Documentation/blob/main/apiDocs/conceptual/start-here-using-an-application.md#bench-verification) for the approved profile and measurement procedure. Use a bench setup with no person connected.
+
+From the repo root, copy the three example JSONs to a writable directory and apply the bench profile there:
+
+```bash
+mkdir -p "$PWD/Config-bench" "$PWD/logs"
+cp Config/*.json "$PWD/Config-bench/"
+printf 'config_path: %s\nlog_path: %s\n' "$PWD/Config-bench" "$PWD/logs/wss-bench.log"
+```
+
+The example `stimConfig.json` uses H03 and first receiver `0x81`. Set its firmware and receiver address to match the bench device. The shipped `stimParams.json` has example calibration on `ch1` and zeroed calibration on `ch2` and `ch3`. Use the approved calibration and paired model config for `ch1`. The node updates `maxWSS` based on the number of enabled topics, with up to three topics selecting one device. It writes this value into the active `stimConfig.json`, so use the writable copy.
+
+Create `wss-bench.yaml` in the repo root with the following entries. Replace the first two paths with the full paths printed above. Replace the serial port with the path of the intended WSS device. See [Linux serial dependencies and permissions](https://github.com/cwru-non-academic/WSSCore#linux-serial-setup) if the port is unavailable.
+
+```yaml
+config_path: '/absolute/path/to/ROS_Python_WSS_Application/Config-bench'
+log_path: '/absolute/path/to/ROS_Python_WSS_Application/logs/wss-bench.log'
+transport: serial
+serial_port: '/dev/ttyUSB0'
+ch1_topic: /dom/thumb/stimulation_value
+ch2_topic: ''
+ch3_topic: ''
+ch4_topic: ''
+ch5_topic: ''
+ch6_topic: ''
+ch7_topic: ''
+ch8_topic: ''
+ch9_topic: ''
+```
+
+The launch file accepts this flat YAML through `config_file`. Always pass the absolute path to your YAML. The installed example YAML contains paths specific to another machine. For BLE, change `transport` to `ble`, remove `serial_port`, and add `ble_device_name` with the exact advertised NUS name or `ble_device_id` with its local identifier.
+
+### Launch, publish, and stop
+
+1. In the first terminal with both ROS environments sourced, run:
+
    ```bash
-   git clone --recurse-submodules git@github.com:cwru-non-academic/ROS_Python_WSS_Application.git
-   cd ROS_Python_WSS_Application
+   export PYTHONNET_RUNTIME=coreclr
+   ros2 launch hfi_ros_wss_driver launch_ros_wss_driver.launch.py config_file:="$PWD/wss-bench.yaml"
    ```
 
-2. **Install Dependencies**:
-   Source your ROS2 environment and ensure `pythonnet` is available to the Python
-   interpreter used by ROS. If it is not already installed, install the runtime
-   prerequisite with that interpreter:
+   Check that the node reports the expected transport, config, log, and topic-to-channel mapping. Setup continues after the initialization banner and starts streaming automatically. Check the Core log for an acknowledged `StartStim` for the device before publishing. Diagnose setup retries or missing acknowledgments in that log.
+
+2. In a second Bash terminal, change to the same repo root and source both environments. Inspect the subscriber before sending a message:
 
    ```bash
-   python3 -m pip install -r requirements.txt
-   ```
-
-   A separate installation of `wss-py-wrapper` is no longer required. The build
-   installs the pinned wrapper source and complete DLL payload together. Existing
-   ROS/CLR environments can be reused; the CI development host versions below are
-   not a new requirement to install a .NET SDK on the application computer.
-
-3. **Review Driver Configuration**:
-   Update `config/default_ros_wss_driver_params.yaml` as needed.
-   The ROS2 YAML specifies:
-   - the app-owned WSS `Config/` directory path
-   - the log file path
-   - the transport (`serial`, `ble`, `test`, or `conformance`) and serial port
-   - explicit BLE selection by device name, device ID, or auto-selection
-   - whether to use the wrapper test or conformance transport
-   - the WSS setup retry count
-   - the WSS tick interval in milliseconds
-   - up to nine ROS topic names mapped to `ch1` through `ch9`
-
-4. **Compile the Package**:
-   Build the package using `colcon`:
-   ```bash
-   colcon build --packages-select hfi_ros_wss_driver --symlink-install
+   source /opt/ros/humble/setup.bash
    source install/setup.bash
+   ros2 topic info /dom/thumb/stimulation_value
+   read -r -p 'Bench-profile normalized magnitude: ' magnitude
+   ros2 topic pub --once /dom/thumb/stimulation_value std_msgs/msg/Float64 "{data: $magnitude}"
    ```
 
-### Updating an existing checkout
+   Use the normalized input specified by your bench profile. The driver clamps incoming values to `[0.0, 1.0]` before applying the active model and calibration to `ch1`. A subscription or successful publish verifies ROS delivery prerequisites. Confirm the actual output with the bench procedure.
+
+3. Stop any publishers and press **Ctrl+C** in the launch terminal to tear down the driver and its WSS controller. Verify output has ceased. Restart the driver after changing transports, receiver addresses, or configuration paths.
+
+For a hardware-free rehearsal, copy the YAML, set `transport: test`, and remove `serial_port` and any BLE selectors. Use a disposable JSON directory and a separate log. The `conformance` transport also keeps the ROS node running with the selected profiles and topics.
+
+## Updating an existing checkout
 
 Stop the running node, then use the normal update/rebuild sequence:
 
@@ -79,45 +102,6 @@ library branch. Restart the node after rebuilding; replacing WSS assemblies
 inside a running process is unsupported. No existing publisher/client code needs
 to change. Retain existing YAML and calibration paths; the example YAML's absolute
 paths are examples for an existing installation, not portable defaults.
-
-## Running the ROS WSS Driver
-
-1. **Create and Edit Configuration File**:
-   Modify `default_ros_wss_driver_params.yaml` as needed to set your desired parameters.
-
-2. **Launch the Driver**:
-   Execute the following command, specifying the path to your configuration file:
-   ```bash
-   ros2 launch hfi_ros_wss_driver launch_ros_wss_driver.launch.py
-   ```
-
-3. **Publish a Test Command**:
-   For the default channel 2 mapping:
-   ```bash
-   ros2 topic pub /dom/index/stimulation_value std_msgs/msg/Float64 "{data: 0.5}" --once
-   ```
-
-Transport parameters are additive; existing YAML, topic names and publishers
-continue to work. `transport` defaults to `serial`. For BLE set `transport: ble`
-and one of `ble_device_name`, `ble_device_id`, or `ble_auto: true`. Empty BLE
-selectors are rejected rather than silently scanning. BLE cannot be combined
-with `serial_port`, `test_mode`, or `conformance_mode`.
-
-`transport: test` and `transport: conformance` select Core's in-memory transports;
-`test_mode: true` remains supported and `conformance_mode: true` is an equivalent
-explicit flag. Unlike the CLI one-shot diagnostic, the ROS node remains running
-with the application's configuration and topics in these modes. Use a suitable
-WSS configuration for the emulated firmware. Conflicting simulated modes are
-rejected before configuration files are changed or a controller is initialized.
-
-The shared wrapper selects each OS's BLE backend, including the macOS managed
-backend and paired native dylib, without a separate ROS BLE implementation.
-Use `PYTHONNET_RUNTIME=coreclr` with a compatible installed CLR where needed.
-This prepares the application transport path on macOS; native ROS Humble support
-is tested only on Ubuntu 22.04. macOS platform checks double the ROS APIs and
-exercise actual Core constructors, with no radio discovery or connection.
-
-Incoming values are clamped to the range `[0.0, 1.0]` before being sent to `StimWithMode("chN", value)`.
 
 ## Running Unit Tests
 
@@ -166,9 +150,9 @@ The unchanged candidate preflight retains its `ROS compatibility` acceptance nam
 - The wrapper submodule remains at `HFI_WSS_Python_Interface/` and provides the Python package and `Cs_Libraries/` DLLs.
 - `test_mode: true` switches the wrapper to its test transport instead of serial transport.
 - `max_retries` defaults to `5` and `tick_interval_ms` defaults to `10`.
-- The number of non-empty channel topics updates `Config/stimConfig.json` `maxWSS` automatically: 1-3 topics -> `1`, 4-6 topics -> `2`, 7-9 topics -> `3`.
+- The number of non-empty channel topics updates `Config/stimConfig.json` `maxWSS` automatically: 0-3 topics -> `1`, 4-6 topics -> `2`, 7-9 topics -> `3`.
 - Leave a channel topic empty in the YAML to disable that channel subscription.
-- The default example maps `/dom/index/stimulation_value` to `ch2`.
+- The shipped YAML maps `/dom/index/stimulation_value` to `ch2`. The first-run YAML uses `/dom/thumb/stimulation_value` with `ch1`.
 - Startup reports the selected wrapper file and DLL directory. Bundled wrapper
   code takes precedence over an unrelated pip installation. A different wrapper
   already imported in the process causes a clear restart error, not a hot swap.
@@ -177,11 +161,7 @@ The unchanged candidate preflight retains its `ROS compatibility` acceptance nam
   The node honors it and warns that compatibility is unverified. It does not
   silently fall back, enforce a version/hash allowlist, alter calibration, or
   select another serial port. Load/initialization errors stop startup.
-- The existing Core model-capacity limitation remains: `StimWithMode` sizes model
-  state by device count rather than channel count. Existing nested model constants
-  also retain their historical fallback behavior because Core looks up bare keys.
-  Neither behavior is repaired by this compatibility change. Calibration or Core
-  behavior corrections require their own review because output can change.
+
 
 ## Device addresses and setup diagnostics
 
