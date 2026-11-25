@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from ros_stubs import Float64, Node, install
+from ros_stubs import ExternalShutdownException, Float64, Node, install
 
 install()
 driver = importlib.import_module("hfi_ros_wss_driver.ros_wss_driver_node")
@@ -172,18 +172,36 @@ class RosContractTests(unittest.TestCase):
                 driver.RosWssDriverNode()
         self.assertEqual(shutdown.call_count, 1)
 
-    def test_entrypoint_shuts_down_ros_after_construction_failure(self):
-        import importlib.util
-        import sys
+    @staticmethod
+    def load_entrypoint():
         script = Path(__file__).resolve().parents[1] / "scripts" / "ros_wss_driver.py"
         spec = importlib.util.spec_from_file_location("entrypoint_fixture", script)
         entrypoint = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(entrypoint)
-        ros = sys.modules["rclpy"]
-        with patch.object(ros, "init", create=True), patch.object(ros, "shutdown", create=True) as shutdown, patch.object(entrypoint, "RosWssDriverNode", side_effect=RuntimeError("init fixture")):
+        return entrypoint
+
+    def test_entrypoint_shuts_down_ros_after_construction_failure(self):
+        entrypoint = self.load_entrypoint()
+        ros = entrypoint.rclpy
+        with patch.object(ros, "init", create=True), patch.object(ros, "try_shutdown", create=True) as shutdown, patch.object(entrypoint, "RosWssDriverNode", side_effect=RuntimeError("init fixture")):
             with self.assertRaisesRegex(RuntimeError, "init fixture"):
                 entrypoint.main()
         shutdown.assert_called_once_with()
+
+    def test_entrypoint_cleans_up_when_ros_is_interrupted(self):
+        entrypoint = self.load_entrypoint()
+        ros = entrypoint.rclpy
+        for reason in (KeyboardInterrupt, ExternalShutdownException):
+            with (
+                self.subTest(reason=reason.__name__),
+                patch.object(ros, "init", create=True),
+                patch.object(ros, "spin", side_effect=reason, create=True),
+                patch.object(ros, "try_shutdown", create=True) as shutdown,
+                patch.object(entrypoint, "RosWssDriverNode") as constructor,
+            ):
+                entrypoint.main()
+                constructor.return_value.destroy_node.assert_called_once_with()
+                shutdown.assert_called_once_with()
 
 
 if __name__ == "__main__":
