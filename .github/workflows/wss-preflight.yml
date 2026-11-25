@@ -465,7 +465,10 @@ jobs:
       - name: Install development prerequisites
         run: |
           apt-get update
-          apt-get install -y git python3-pip python3-colcon-common-extensions ros-humble-ament-cmake-python ros-humble-launch-ros
+          apt-get install -y git libicu70 python3-pip python3-colcon-common-extensions ros-humble-ament-cmake-python ros-humble-launch-ros
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.316'
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ros_sha || github.sha }}
@@ -494,7 +497,7 @@ jobs:
           cp -a wrapper/src "$RUNNER_TEMP/ros-runtime/HFI_WSS_Python_Interface/src"
           cp -a transfer/payload "$RUNNER_TEMP/ros-runtime/HFI_WSS_Python_Interface/Cs_Libraries"
           python3 -m pip install pythonnet==3.0.5
-      - name: Build symlink layout and verify launch and DDS callbacks
+      - name: Build symlink layout and verify launch, DDS, and driver shutdown
         shell: bash
         run: |
           set -eo pipefail

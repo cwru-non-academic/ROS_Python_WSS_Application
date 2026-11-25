@@ -47,8 +47,13 @@ class Float64:
         self.data = data
 
 
+class ExternalShutdownException(Exception):
+    pass
+
+
 def install():
-    for name in ("rclpy", "rclpy.node", "std_msgs", "std_msgs.msg"):
+    for name in ("rclpy", "rclpy.executors", "rclpy.node", "std_msgs", "std_msgs.msg"):
         sys.modules[name] = types.ModuleType(name)
+    sys.modules["rclpy.executors"].ExternalShutdownException = ExternalShutdownException
     sys.modules["rclpy.node"].Node = Node
     sys.modules["std_msgs.msg"].Float64 = Float64
